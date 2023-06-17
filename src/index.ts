@@ -1,5 +1,5 @@
 import "dotenv/config.js";
-import { Server } from "./lib/server.js";
+import { Server } from "./server.js";
 
 const server = new Server();
 
@@ -22,4 +22,3 @@ server.start(Number(process.env.PORT ?? 3000), process.env.HOST ?? "0.0.0.0")
         server.fastify.log.error(err, "Error starting server");
         process.exit(1);
     });
-

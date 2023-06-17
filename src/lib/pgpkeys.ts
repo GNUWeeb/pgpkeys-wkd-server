@@ -47,7 +47,9 @@ export class pgpkeys extends Map<string, openpgp.PublicKey[]> {
                     .map(async content => openpgp.readKey({ armoredKey: await content }))
             );
 
-            this.set(wkdHash, pubKeys);
+            if (pubKeys.length === 0) throw new Error(`No public keys found for WKD hash ${wkdHash}`);
+
+            this.set(wkdHash, pubKeys.sort((a, b) => b.getCreationTime().getTime() - a.getCreationTime().getTime()));
         }
     }
 }
