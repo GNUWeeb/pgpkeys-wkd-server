@@ -23,6 +23,8 @@ export class Server {
             if (!this.pgpkeys.has(wkdHash)) return res.status(404).send();
 
             const pubKeys = this.pgpkeys.get(wkdHash)!;
+
+            // Concatenate all public keys into a single binary blob
             const pubKeysBinary = Buffer.concat(
                 pubKeys
                     .map(p => p.toPacketList().write())
@@ -37,7 +39,7 @@ export class Server {
     }
 
     public async start(port: number, host = "0.0.0.0"): Promise<any> {
-        // Load map and keys
+        // Load mapping and keys
         await this.pgpkeys.loadMap();
         await this.pgpkeys.loadKeys();
 

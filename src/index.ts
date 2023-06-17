@@ -1,4 +1,4 @@
-import "dotenv/config.js";
+import { host, port } from "./constants.js";
 import { Server } from "./server.js";
 
 const server = new Server();
@@ -17,7 +17,7 @@ process
         process.exit(1);
     });
 
-server.start(Number(process.env.PORT ?? 3000), process.env.HOST ?? "0.0.0.0")
+server.start(port, host)
     .catch(err => {
         server.fastify.log.error(err, "Error starting server");
         process.exit(1);

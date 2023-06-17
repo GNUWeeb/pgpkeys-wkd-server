@@ -1,4 +1,4 @@
-import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL } from "../consts.js";
+import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "../constants.js";
 import fetch from "node-fetch";
 import openpgp from "openpgp";
 
@@ -21,10 +21,11 @@ export class pgpkeys extends Map<string, openpgp.PublicKey[]> {
             // Filter out empty strings
             const pubKeys = pubKeys0.split("\n")
                 .filter(Boolean)
-                .map(p => p.substring("P: ".length));
+                .map(p => p.substring(pubKeyEntry.length));
 
             if (pubKeys.length === 0) throw new Error(`No public keys found for UID ${UID}`);
 
+            // Filter out emails that don't match our regex
             if (!emailRegex.test(UID)) continue;
 
             if (this.mapping.has(wkdHash)) {
@@ -49,6 +50,7 @@ export class pgpkeys extends Map<string, openpgp.PublicKey[]> {
 
             if (pubKeys.length === 0) throw new Error(`No public keys found for WKD hash ${wkdHash}`);
 
+            // Sorted by creation time, newest first
             this.set(wkdHash, pubKeys.sort((a, b) => b.getCreationTime().getTime() - a.getCreationTime().getTime()));
         }
     }
