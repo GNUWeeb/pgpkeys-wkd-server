@@ -12,8 +12,8 @@ process
         server.fastify.log.error(err, "Uncaught exception");
         process.exit(1);
     })
-    .on("unhandledRejection", (reason, promise) => {
-        server.fastify.log.error({ promise, reason }, "Unhandled rejection");
+    .on("unhandledRejection", (reason: string) => {
+        server.fastify.log.error(new Error(reason), "Unhandled rejection");
         process.exit(1);
     });
 
@@ -22,3 +22,4 @@ server.start(Number(process.env.PORT), process.env.HOST)
         server.fastify.log.error(err, "Error starting server");
         process.exit(1);
     });
+
