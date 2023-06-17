@@ -2,9 +2,13 @@ import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL } from "../consts.js";
 import fetch from "node-fetch";
 import openpgp from "openpgp";
 
-export class pgpkeys {
-    public map = new Map<string, MapEntry>();
-    public keys = new Map<string, openpgp.PublicKey[]>();
+export class pgpkeys extends Map<string, openpgp.PublicKey[]> {
+    public mapping = new Map<string, MapEntry>();
+
+    public constructor() {
+        super();
+        Object.defineProperty(this, "mapping", { enumerable: false });
+    }
 
     public async loadMap(): Promise<void> {
         const map = await fetch(mapFileURL)
@@ -23,12 +27,19 @@ export class pgpkeys {
 
             if (!emailRegex.test(UID)) continue;
 
-            this.map.set(wkdHash, { uid: UID, wkdHash, pubKeys });
+            if (this.mapping.has(wkdHash)) {
+                const entry = this.mapping.get(wkdHash)!;
+                entry.uid.push(UID);
+                entry.pubKeys.push(...pubKeys);
+                this.mapping.set(wkdHash, entry);
+            } else {
+                this.mapping.set(wkdHash, { uid: [UID], pubKeys });
+            }
         }
     }
 
     public async loadKeys(): Promise<void> {
-        for (const [wkdHash, { pubKeys: pubKeyFiles }] of this.map) {
+        for (const [wkdHash, { pubKeys: pubKeyFiles }] of this.mapping) {
             const pubKeys = await Promise.all(
                 pubKeyFiles
                     .map(pubKeyURL)
@@ -36,13 +47,12 @@ export class pgpkeys {
                     .map(async content => openpgp.readKey({ armoredKey: await content }))
             );
 
-            this.keys.set(wkdHash, pubKeys);
+            this.set(wkdHash, pubKeys);
         }
     }
 }
 
 export interface MapEntry {
-    uid: string;
-    wkdHash: string;
+    uid: string[];
     pubKeys: string[];
 }
