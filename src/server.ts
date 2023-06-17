@@ -1,9 +1,9 @@
 import fastify from "fastify";
-import { PGPKeyManager } from "./lib/PGPKeyManager.js";
+import { WKDEntryManager } from "./lib/WKDEntryManager.js";
 
 export class Server {
     public fastify = fastify({ logger: true });
-    public pgpkeys = new PGPKeyManager();
+    public wkd = new WKDEntryManager();
 
     public registerRoutes(): void {
         // We currently don't handle Web Key Directory Update Protocol, so empty string is fine.
@@ -12,7 +12,7 @@ export class Server {
         this.fastify.head("/hu/:wkdHash", (req, res) => {
             const { wkdHash } = req.params as { wkdHash: string };
 
-            if (!this.pgpkeys.has(wkdHash)) return res.status(404).send();
+            if (!this.wkd.has(wkdHash)) return res.status(404).send();
 
             return res.status(200).send();
         });
@@ -20,9 +20,9 @@ export class Server {
         this.fastify.get("/hu/:wkdHash", (req, res) => {
             const { wkdHash } = req.params as { wkdHash: string };
 
-            if (!this.pgpkeys.has(wkdHash)) return res.status(404).send();
+            if (!this.wkd.has(wkdHash)) return res.status(404).send();
 
-            const pubKeys = this.pgpkeys.get(wkdHash)!.pubKeys;
+            const pubKeys = this.wkd.get(wkdHash)!.pubKeys;
 
             // Concatenate all public keys into a single binary blob
             const pubKeysBinary = Buffer.concat(
@@ -42,15 +42,13 @@ export class Server {
         this.fastify.log.info("Hello! Loading keys and starting server...");
 
         // Load keys
-        await this.pgpkeys.loadKeys();
+        await this.wkd.loadKeys();
+        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.pubKeys.length, 0);
+        this.fastify.log.info(`Loaded ${total} keys of ${this.wkd.size} WKD entries`);
 
-        const total = Array.from(this.pgpkeys.values()).reduce((acc, val) => acc + val.pubKeys.length, 0);
-        this.fastify.log.info(`Loaded ${total} keys of ${this.pgpkeys.size} WKD entries`);
-
+        // Start server
         await this.fastify.register(import("@fastify/compress"));
-
         this.registerRoutes();
-
         return this.fastify.listen({ port, host });
     }
 
