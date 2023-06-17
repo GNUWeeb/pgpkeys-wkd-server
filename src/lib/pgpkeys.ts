@@ -1,62 +1,63 @@
 import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "../constants.js";
-import fetch from "node-fetch";
 import openpgp from "openpgp";
+import { fetchContent } from "./util/fetchContent.js";
 
-export class pgpkeys extends Map<string, openpgp.PublicKey[]> {
-    public mapping = new Map<string, MapEntry>();
-
-    public constructor() {
-        super();
-        Object.defineProperty(this, "mapping", { enumerable: false });
-    }
-
-    public async loadMap(): Promise<void> {
-        const map = await fetch(mapFileURL)
-            .then(res => res.text());
+export class pgpkeys extends Map<EntryKey, Entry> {
+    public async loadKeys(): Promise<void> {
+        const { data: map } = await fetchContent(mapFileURL);
 
         let match;
         while ((match = mapItemRegex.exec(map)) !== null) {
-            const { UID, wkdHash, pubKeys: pubKeys0 } = match.groups!;
-
-            // Filter out empty strings
-            const pubKeys = pubKeys0.split("\n")
-                .filter(Boolean)
-                .map(p => p.substring(pubKeyEntry.length));
-
-            if (pubKeys.length === 0) throw new Error(`No public keys found for UID ${UID}`);
+            const { UID, wkdHash: entry, pubKeyFiles } = match.groups!;
 
             // Filter out emails that don't match our regex
             if (!emailRegex.test(UID)) continue;
 
-            if (this.mapping.has(wkdHash)) {
-                const entry = this.mapping.get(wkdHash)!;
-                entry.uid.push(UID);
-                entry.pubKeys.push(...pubKeys);
-                this.mapping.set(wkdHash, entry);
+            const pubKeyFilesURL = pubKeyFiles
+                .split("\n")
+                .filter(Boolean) // Filter out empty strings
+                .map(p => p.substring(pubKeyEntry.length)) // Remove "P: " from the start
+                .map(pubKeyURL); // Convert to URL
+
+            if (pubKeyFilesURL.length === 0) throw new Error(`No public keys found for UID ${UID} / Entry ${entry}`);
+
+            // Resolve pubKeys
+            const pubKeys = await Promise.all(
+                pubKeyFilesURL
+                    .map(url => fetchContent(url)) // Fetch the content
+                    .map(async content => { // Read the key
+                        const { data, etag } = await content;
+                        return { etag, data: await openpgp.readKey({ armoredKey: data }) };
+                    })
+            );
+
+            if (this.has(entry)) {
+                const data = this.get(entry)!;
+                data.uid.push(UID);
+                // Sort by creation time (newest first)
+                data.pubKeys.push(...pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
+                this.set(entry, data);
             } else {
-                this.mapping.set(wkdHash, { uid: [UID], pubKeys });
+                this.set(entry, { uid: [UID], pubKeys });
             }
         }
     }
 
-    public async loadKeys(): Promise<void> {
-        for (const [wkdHash, { pubKeys: pubKeyFiles }] of this.mapping) {
-            const pubKeys = await Promise.all(
-                pubKeyFiles
-                    .map(pubKeyURL)
-                    .map(url => fetch(url).then(res => res.text()))
-                    .map(async content => openpgp.readKey({ armoredKey: await content }))
-            );
-
-            if (pubKeys.length === 0) throw new Error(`No public keys found for WKD hash ${wkdHash}`);
-
-            // Sorted by creation time, newest first
-            this.set(wkdHash, pubKeys.sort((a, b) => b.getCreationTime().getTime() - a.getCreationTime().getTime()));
+    public findEntryKey(fingerprint: string): EntryKey | undefined {
+        for (const [entry, { pubKeys }] of this.entries()) {
+            if (pubKeys.some(p => p.data.getFingerprint().toUpperCase() === fingerprint.toUpperCase())) return entry;
         }
+        return undefined;
     }
 }
 
-export interface MapEntry {
+export interface Entry {
     uid: string[];
-    pubKeys: string[];
+    pubKeys: PublicKeyData[];
+}
+export type EntryKey = string;
+
+export interface PublicKeyData {
+    data: openpgp.PublicKey;
+    etag: string;
 }

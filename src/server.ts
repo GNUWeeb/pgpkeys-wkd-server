@@ -22,29 +22,30 @@ export class Server {
 
             if (!this.pgpkeys.has(wkdHash)) return res.status(404).send();
 
-            const pubKeys = this.pgpkeys.get(wkdHash)!;
+            const pubKeys = this.pgpkeys.get(wkdHash)!.pubKeys;
 
             // Concatenate all public keys into a single binary blob
             const pubKeysBinary = Buffer.concat(
                 pubKeys
-                    .map(p => p.toPacketList().write())
+                    .map(p => p.data.toPacketList().write())
             );
 
             return res
                 .header("Content-Type", "application/octet-stream")
-                .header("X-Fingerprints", pubKeys.map(p => p.getFingerprint().toUpperCase()).join(","))
+                .header("X-Fingerprints", pubKeys.map(p => p.data.getFingerprint().toUpperCase()).join(","))
                 .status(200)
                 .send(pubKeysBinary);
         });
     }
 
     public async start(port: number, host = "0.0.0.0"): Promise<any> {
-        // Load mapping and keys
-        await this.pgpkeys.loadMap();
+        this.fastify.log.info("Hello! Loading keys and starting server...");
+
+        // Load keys
         await this.pgpkeys.loadKeys();
 
-        const total = Array.from(this.pgpkeys.values()).reduce((acc, val) => acc + val.length, 0);
-        this.fastify.log.info(`Loaded ${total} keys of ${this.pgpkeys.size} key owners from mapping`);
+        const total = Array.from(this.pgpkeys.values()).reduce((acc, val) => acc + val.pubKeys.length, 0);
+        this.fastify.log.info(`Loaded ${total} keys of ${this.pgpkeys.size} WKD entries`);
 
         await this.fastify.register(import("@fastify/compress"));
 
