@@ -1,0 +1,39 @@
+{
+  "name": "pgpkeys-wkd-server",
+  "version": "0.0.1",
+  "description": "A Simple HTTP Server to serve GNUWeeb's pgpkeys via WKD",
+  "license": "GPL-2.0",
+  "author": "",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "pnpm run lint && pnpm run compile",
+    "compile": "tsc --build tsconfig.json",
+    "lint": "eslint . --ignore-path .gitignore --ext .ts",
+    "lint:fix": "pnpm run lint -- --fix",
+    "start": "node dist/index.js",
+    "start:dev": "pnpm run compile && pnpm run start"
+  },
+  "eslintConfig": {
+    "extends": "@hazmi35/eslint-config/typescript",
+    "ignorePatterns": [
+      "dist/*",
+      "scripts/*"
+    ]
+  },
+  "dependencies": {
+    "@fastify/compress": "^6.4.0",
+    "dotenv": "^16.3.0",
+    "fastify": "^4.18.0",
+    "node-fetch": "^3.3.1",
+    "openpgp": "^5.9.0"
+  },
+  "devDependencies": {
+    "@hazmi35/eslint-config": "^10.0.0",
+    "@types/node": "^20.3.1",
+    "@typescript-eslint/eslint-plugin": "^5.59.11",
+    "@typescript-eslint/parser": "^5.59.11",
+    "eslint": "^8.43.0",
+    "typescript": "^5.1.3"
+  }
+}
