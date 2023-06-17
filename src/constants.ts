@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-export const mapItemRegex = /^U: (?<UID>.+)\nW: (?<wkdHash>.+)\n(?<pubKeys>(?<pubKeyFile>P: .+\n)*)/gm;
+export const mapItemRegex = /^U: (?<UID>.+)\nW: (?<wkdHash>.+)\n(?<pubKeyFiles>(?<pubKeyFile>P: .+\n)*)/gm;
 export const emailRegex = /\b[A-Za-z0-9._%+-]+@gnuweeb\.org\b/;
 export const pubKeyEntry = "P: ";
 
