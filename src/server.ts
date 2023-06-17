@@ -44,7 +44,7 @@ export class Server {
         await this.pgpkeys.loadKeys();
 
         const total = Array.from(this.pgpkeys.values()).reduce((acc, val) => acc + val.length, 0);
-        this.fastify.log.info(`Loaded ${total} of keys with ${this.pgpkeys.size} key owners from mapping`);
+        this.fastify.log.info(`Loaded ${total} keys of ${this.pgpkeys.size} key owners from mapping`);
 
         await this.fastify.register(import("@fastify/compress"));
 
