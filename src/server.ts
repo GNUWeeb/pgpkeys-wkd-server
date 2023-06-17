@@ -1,5 +1,6 @@
 import fastify from "fastify";
 import { WKDEntryManager } from "./lib/WKDEntryManager.js";
+import { updateHook } from "./lib/util/handleWebhook.js";
 
 export class Server {
     public fastify = fastify({ logger: true });
@@ -30,6 +31,8 @@ export class Server {
                 .status(200)
                 .send(pubKeys.combineBinary());
         });
+
+        this.fastify.post("/internal/updateHook", (req, res) => updateHook(req, res, this.wkd));
     }
 
     public async start(port: number, host = "0.0.0.0"): Promise<any> {

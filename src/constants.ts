@@ -9,3 +9,7 @@ export const emailDomain = process.env.EMAIL_DOMAIN ?? "gnuweeb.org";
 export const mapItemRegex = /^U: (?<UID>.+)\nW: (?<wkdHash>.+)\n(?<pubKeyFiles>(?<pubKeyFile>P: .+\n)*)/gm;
 export const emailRegex = new RegExp(`\\b[A-Za-z0-9._%+-]+@${emailDomain}\\b`);
 export const pubKeyEntry = "P: ";
+
+export const webhookSecret = process.env.WEBHOOK_SECRET!;
+
+if (!webhookSecret) throw new Error("No webhook secret provided");
