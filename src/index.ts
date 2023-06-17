@@ -17,7 +17,7 @@ process
         process.exit(1);
     });
 
-server.start(Number(process.env.PORT), process.env.HOST)
+server.start(Number(process.env.PORT ?? 3000), process.env.HOST ?? "0.0.0.0")
     .catch(err => {
         server.fastify.log.error(err, "Error starting server");
         process.exit(1);
