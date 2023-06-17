@@ -1,9 +1,9 @@
 import fastify from "fastify";
-import { pgpkeys } from "./lib/pgpkeys.js";
+import { PGPKeyManager } from "./lib/PGPKeyManager.js";
 
 export class Server {
     public fastify = fastify({ logger: true });
-    public pgpkeys = new pgpkeys();
+    public pgpkeys = new PGPKeyManager();
 
     public registerRoutes(): void {
         // We currently don't handle Web Key Directory Update Protocol, so empty string is fine.

@@ -2,7 +2,7 @@ import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "..
 import openpgp from "openpgp";
 import { fetchContent } from "./util/fetchContent.js";
 
-export class pgpkeys extends Map<EntryKey, Entry> {
+export class PGPKeyManager extends Map<EntryKey, Entry> {
     public async loadKeys(): Promise<void> {
         const { data: map } = await fetchContent(mapFileURL);
 
