@@ -1,6 +1,6 @@
 {
   "name": "pgpkeys-wkd-server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A Simple HTTP Server to serve GNUWeeb's pgpkeys via WKD",
   "license": "GPL-2.0",
   "author": "",
