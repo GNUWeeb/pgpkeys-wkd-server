@@ -22,7 +22,7 @@ export class Server {
 
             if (!this.wkd.has(wkdHash)) return res.status(404).send();
 
-            const pubKeys = this.wkd.get(wkdHash)!.pubKeys;
+            const pubKeys = this.wkd.get(wkdHash)!;
 
             // Concatenate all public keys into a single binary blob
             const pubKeysBinary = Buffer.concat(
@@ -43,7 +43,7 @@ export class Server {
 
         // Load keys
         await this.wkd.loadKeys();
-        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.pubKeys.length, 0);
+        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.length, 0);
         this.fastify.log.info(`Loaded ${total} keys of ${this.wkd.size} WKD entries`);
 
         // Start server

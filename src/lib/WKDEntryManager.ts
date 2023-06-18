@@ -7,12 +7,11 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
         // Get pubKeys files and raw entries
         const keys = await WKDEntryManager.getKeysURL();
 
-        for (const [entry, rawEntry] of keys.entries()) {
+        for (const [entry, pubKeysURLs] of keys.entries()) {
             // Resolve pubKeysURL
             const pubKeysData = (
                 await Promise.all(
-                    rawEntry
-                        .files
+                    pubKeysURLs
                         .map(url => fetchContent(url)) // Fetch the content
                 )
             ).filter((data): data is Content => data !== null);
@@ -24,12 +23,12 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
             );
 
             // Sort pubKeys by creation time (newest first)
-            this.set(entry, { uid: rawEntry.uid, pubKeys: pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()) });
+            this.set(entry, pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
         }
     }
 
     public findEntryKey(fingerprint: string): EntryKey | undefined {
-        for (const [entry, { pubKeys }] of this.entries()) {
+        for (const [entry, pubKeys] of this.entries()) {
             if (pubKeys.some(p => p.data.getFingerprint().toUpperCase() === fingerprint.toUpperCase())) return entry;
         }
         return undefined;
@@ -39,11 +38,11 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
         return this.findEntryKey(fingerprint) !== undefined;
     }
 
-    private static async getKeysURL(): Promise<Map<EntryKey, EntryRaw>> {
+    private static async getKeysURL(): Promise<WKDRawEntry> {
         const map = await fetchContent(mapFileURL);
         if (!map) throw new Error("No map file found");
 
-        const result = new Map<EntryKey, EntryRaw>();
+        const result = new Map() as WKDRawEntry;
 
         let match;
         while ((match = mapItemRegex.exec(map.data)) !== null) {
@@ -62,11 +61,10 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
 
             if (result.has(entry)) {
                 const data = result.get(entry)!;
-                data.uid.push(entry);
-                data.files.push(...pubKeyFilesURL);
+                data.push(...pubKeyFilesURL);
                 result.set(entry, data);
             } else {
-                result.set(entry, { uid: [uid], files: pubKeyFilesURL });
+                result.set(entry, pubKeyFilesURL);
             }
         }
 
@@ -75,15 +73,10 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
 }
 
 export type EntryKey = string;
-export interface EntryRaw {
-    uid: string[];
-    files: URL[];
-}
+export type PublicKeyURL = URL;
+export type WKDRawEntry = Map<EntryKey, PublicKeyURL[]>;
 export interface PublicKeyData {
     data: openpgp.PublicKey;
     etag: string;
 }
-export interface Entry {
-    uid: string[];
-    pubKeys: PublicKeyData[];
-}
+export type Entry = PublicKeyData[];
