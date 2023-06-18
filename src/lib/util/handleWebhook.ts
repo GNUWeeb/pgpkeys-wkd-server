@@ -31,13 +31,13 @@ export function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntry
     const removed = filterKeyFiles(body.commits.flatMap(c => c.removed));
 
     if (modified.length > 0) {
-        const anyKeyModified = modified.some(f => wkd.hasFingerprint(f));
+        const anyKeyModified = modified.some(f => wkd.hasPubKey(f));
         if (!anyKeyModified) return { ok: true, action: null };
 
         // TODO: Update key in WKD Entry
     }
     if (removed.length > 0) {
-        const anyKeyRemoved = removed.some(f => wkd.hasFingerprint(f));
+        const anyKeyRemoved = removed.some(f => wkd.hasPubKey(f));
         if (!anyKeyRemoved) return { ok: true, action: null };
 
         // TODO: Remove key from WKD Entry
