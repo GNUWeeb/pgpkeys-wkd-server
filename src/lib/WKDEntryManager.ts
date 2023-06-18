@@ -22,6 +22,9 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
                     .map(async ({ etag, data }) => ({ etag, data: await openpgp.readKey({ armoredKey: data }) })) // Parse the key
             );
 
+            // Don't add entry if there are no keys
+            if (pubKeys.length === 0) continue;
+
             // Sort pubKeys by creation time (newest first)
             this.set(entry, pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
         }
