@@ -30,8 +30,16 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         return undefined;
     }
 
-    public hasPubKey(fingerprint: string): boolean {
-        return this.findEntryKey(fingerprint) !== undefined;
+    public hasPubKey(fingerprint: string): boolean { return this.findEntryKey(fingerprint) !== undefined; }
+
+    public deletePubKey(fingerprint: string): PubKey | undefined {
+        const pubKeys = this.get(this.findEntryKey(fingerprint)!);
+        const deleted = pubKeys?.deleteFingerprint(fingerprint);
+
+        // Delete the entry if there are no more keys
+        if (pubKeys?.size === 0) this.delete(pubKeys.entry);
+
+        return deleted;
     }
 
     public get pubKeySize(): number { return Array.from(this.values()).reduce((acc, val) => acc + val.size, 0); }

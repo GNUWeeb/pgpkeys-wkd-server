@@ -1,6 +1,6 @@
 import fastify from "fastify";
 import { WKDEntryManager } from "./lib/WKDEntryManager.js";
-import { updateHook } from "./lib/util/handleWebhook.js";
+import { updateHook } from "./lib/util/updateHook.js";
 
 export class Server {
     public fastify = fastify({ logger: true });
@@ -40,8 +40,7 @@ export class Server {
 
         // Load keys
         await this.wkd.loadKeys();
-        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.size, 0);
-        this.fastify.log.info(`Loaded ${total} keys of ${this.wkd.size} WKD entries`);
+        this.fastify.log.info(`Loaded ${this.wkd.pubKeySize} keys of ${this.wkd.size} WKD entries`);
 
         // Start server
         await this.fastify.register(import("@fastify/compress"));
