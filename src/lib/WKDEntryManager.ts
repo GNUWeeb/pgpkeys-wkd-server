@@ -1,7 +1,8 @@
-import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "../constants.js";
+import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry, branch, repository } from "../constants.js";
 import openpgp from "openpgp";
 import { Content, fetchContent } from "./util/fetchContent.js";
 import { PubKeySet } from "./PubKeySet.js";
+import fetch from "node-fetch";
 
 export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
     public async loadKeys(): Promise<void> {
@@ -43,7 +44,9 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
     }
 
     private static async getKeysURL(): Promise<WKDRawEntry> {
-        const map = await fetchContent(mapFileURL);
+        const lastCommitHash = await WKDEntryManager.getLastCommitHash();
+
+        const map = await fetchContent(mapFileURL(lastCommitHash));
         if (!map) throw new Error("No map file found");
 
         const result = new Map() as WKDRawEntry;
@@ -59,7 +62,7 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
                 .split("\n")
                 .filter(Boolean) // Filter out empty strings
                 .map(p => p.substring(pubKeyEntry.length)) // Remove "P: " from the start
-                .map(pubKeyURL); // Convert to URL
+                .map(file => pubKeyURL(lastCommitHash, file)); // Convert to URL
 
             if (pubKeyFilesURL.length === 0) throw new Error(`No public keys found for UID ${uid} / Entry ${entry}`);
 
@@ -73,6 +76,15 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         }
 
         return result;
+    }
+
+    private static async getLastCommitHash(): Promise<string> {
+        const res = await fetch(`https://api.github.com/repos/${repository}/branches/${branch}`);
+        if (!res.ok) throw new Error(`Failed to get last commit hash for branch ${branch}`);
+
+        const data = await res.json() as Record<string, any>;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        return data.commit.sha;
     }
 }
 
