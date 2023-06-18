@@ -35,7 +35,7 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
         return undefined;
     }
 
-    public hasFingerprint(fingerprint: string): boolean {
+    public hasPubKey(fingerprint: string): boolean {
         return this.findEntryKey(fingerprint) !== undefined;
     }
 
