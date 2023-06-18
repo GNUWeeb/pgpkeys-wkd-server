@@ -1,7 +1,9 @@
 import fetch from "node-fetch";
 
-export async function fetchContent(url: URL): Promise<Content> {
+export async function fetchContent(url: URL): Promise<Content | null> {
     const res = await fetch(url);
+
+    if (!res.ok) return null;
 
     return { data: await res.text(), etag: res.headers.get("etag")! };
 }

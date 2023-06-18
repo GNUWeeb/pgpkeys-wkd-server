@@ -1,6 +1,6 @@
 import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "../constants.js";
 import openpgp from "openpgp";
-import { fetchContent } from "./util/fetchContent.js";
+import { Content, fetchContent } from "./util/fetchContent.js";
 
 export class WKDEntryManager extends Map<EntryKey, Entry> {
     public async loadKeys(): Promise<void> {
@@ -8,15 +8,19 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
         const keys = await WKDEntryManager.getKeysURL();
 
         for (const [entry, rawEntry] of keys.entries()) {
-            // Resolve pubKeys
+            // Resolve pubKeysURL
+            const pubKeysData = (
+                await Promise.all(
+                    rawEntry
+                        .files
+                        .map(url => fetchContent(url)) // Fetch the content
+                )
+            ).filter((data): data is Content => data !== null);
+
+            // Parse pubKeys
             const pubKeys = await Promise.all(
-                rawEntry
-                    .files
-                    .map(url => fetchContent(url)) // Fetch the content
-                    .map(async content => { // Read the key
-                        const { data, etag } = await content;
-                        return { etag, data: await openpgp.readKey({ armoredKey: data }) };
-                    })
+                pubKeysData
+                    .map(async ({ etag, data }) => ({ etag, data: await openpgp.readKey({ armoredKey: data }) })) // Parse the key
             );
 
             // Sort pubKeys by creation time (newest first)
@@ -36,12 +40,13 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
     }
 
     private static async getKeysURL(): Promise<Map<EntryKey, EntryRaw>> {
-        const { data: map } = await fetchContent(mapFileURL);
+        const map = await fetchContent(mapFileURL);
+        if (!map) throw new Error("No map file found");
 
         const result = new Map<EntryKey, EntryRaw>();
 
         let match;
-        while ((match = mapItemRegex.exec(map)) !== null) {
+        while ((match = mapItemRegex.exec(map.data)) !== null) {
             const { UID: uid, wkdHash: entry, pubKeyFiles } = match.groups!;
 
             // Filter out emails that don't match our regex
