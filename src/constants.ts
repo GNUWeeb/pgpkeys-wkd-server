@@ -1,17 +1,11 @@
 import "dotenv/config";
 
-export const mapItemRegex = /^U: (?<UID>.+)\nW: (?<wkdHash>.+)\n(?<pubKeyFiles>(?<pubKeyFile>P: .+\n)*)/gm;
-export const emailRegex = /\b[A-Za-z0-9._%+-]+@gnuweeb\.org\b/;
-export const pubKeyEntry = "P: ";
-
-export const repository = "hzmifork/pgpkeys";
-export const branch = "test";
-export const mapFileURL = (commitHash: string): URL => new URL(
-    `https://raw.githubusercontent.com/${repository}/${commitHash}/map.txt`
-);
-export const pubKeyURL = (commitHash: string, pubkeyFile: string): URL => new URL(
-    `https://raw.githubusercontent.com/${repository}/${commitHash}/keys/${pubkeyFile}`
-);
-
 export const host = process.env.HOST ?? "0.0.0.0";
 export const port = Number(process.env.PORT ?? 3000);
+export const repository = process.env.REPOSITORY ?? "GNUWeeb/pgpkeys";
+export const branch = process.env.BRANCH ?? "master";
+export const emailDomain = process.env.EMAIL_DOMAIN ?? "gnuweeb.org";
+
+export const mapItemRegex = /^U: (?<UID>.+)\nW: (?<wkdHash>.+)\n(?<pubKeyFiles>(?<pubKeyFile>P: .+\n)*)/gm;
+export const emailRegex = new RegExp(`\\b[A-Za-z0-9._%+-]+@${emailDomain}\\b`);
+export const pubKeyEntry = "P: ";

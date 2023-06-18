@@ -1,4 +1,4 @@
-import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry, branch, repository } from "../constants.js";
+import { emailRegex, mapItemRegex, pubKeyEntry, branch, repository } from "../constants.js";
 import openpgp from "openpgp";
 import { Content, fetchContent } from "./util/fetchContent.js";
 import { PubKeySet } from "./PubKeySet.js";
@@ -44,9 +44,9 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
     }
 
     private static async getKeysURL(): Promise<WKDRawEntry> {
-        const lastCommitHash = await WKDEntryManager.getLastCommitHash();
+        const lastCommitHash = await this.getLastCommitHash();
 
-        const map = await fetchContent(mapFileURL(lastCommitHash));
+        const map = await fetchContent(this.mapFileURL(lastCommitHash));
         if (!map) throw new Error("No map file found");
 
         const result = new Map() as WKDRawEntry;
@@ -62,7 +62,7 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
                 .split("\n")
                 .filter(Boolean) // Filter out empty strings
                 .map(p => p.substring(pubKeyEntry.length)) // Remove "P: " from the start
-                .map(file => pubKeyURL(lastCommitHash, file)); // Convert to URL
+                .map(file => this.pubKeyURL(lastCommitHash, file)); // Convert to URL
 
             if (pubKeyFilesURL.length === 0) throw new Error(`No public keys found for UID ${uid} / Entry ${entry}`);
 
@@ -85,6 +85,18 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         const data = await res.json() as Record<string, any>;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         return data.commit.sha;
+    }
+
+    private static mapFileURL(commitHash: string): URL {
+        return new URL(
+            `https://raw.githubusercontent.com/${repository}/${commitHash}/map.txt`
+        );
+    }
+
+    private static pubKeyURL(commitHash: string, pubkeyFile: string): URL {
+        return new URL(
+            `https://raw.githubusercontent.com/${repository}/${commitHash}/keys/${pubkeyFile}`
+        );
     }
 }
 
