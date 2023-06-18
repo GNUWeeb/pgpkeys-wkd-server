@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 
-export async function fetchContent(url: URL): Promise<Content | null> {
+export async function fetchContent(url: string): Promise<Content | null> {
     const res = await fetch(url);
 
     if (!res.ok) return null;

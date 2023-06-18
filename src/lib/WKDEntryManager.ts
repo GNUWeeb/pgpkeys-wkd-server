@@ -13,7 +13,7 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
             // Resolve pubKeysURL
             const pubKeysData = (
                 await Promise.all(
-                    pubKeysURLs
+                    Array.from(pubKeysURLs)
                         .map(url => fetchContent(url)) // Fetch the content
                 )
             ).filter((data): data is Content => data !== null);
@@ -68,10 +68,10 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
 
             if (result.has(entry)) {
                 const data = result.get(entry)!;
-                data.push(...pubKeyFilesURL);
+                pubKeyFilesURL.forEach(url => data.add(url));
                 result.set(entry, data);
             } else {
-                result.set(entry, pubKeyFilesURL);
+                result.set(entry, new Set(pubKeyFilesURL));
             }
         }
 
@@ -87,19 +87,14 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         return data.commit.sha;
     }
 
-    private static mapFileURL(commitHash: string): URL {
-        return new URL(
-            `https://raw.githubusercontent.com/${repository}/${commitHash}/map.txt`
-        );
+    private static mapFileURL(commitHash: string): string {
+        return `https://raw.githubusercontent.com/${repository}/${commitHash}/map.txt`;
     }
 
-    private static pubKeyURL(commitHash: string, pubkeyFile: string): URL {
-        return new URL(
-            `https://raw.githubusercontent.com/${repository}/${commitHash}/keys/${pubkeyFile}`
-        );
+    private static pubKeyURL(commitHash: string, pubkeyFile: string): string {
+        return `https://raw.githubusercontent.com/${repository}/${commitHash}/keys/${pubkeyFile}`;
     }
 }
 
 export type EntryKey = string;
-export type PublicKeyURL = URL;
-export type WKDRawEntry = Map<EntryKey, PublicKeyURL[]>;
+export type WKDRawEntry = Map<EntryKey, Set<string>>;
