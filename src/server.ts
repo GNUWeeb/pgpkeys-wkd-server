@@ -24,17 +24,11 @@ export class Server {
 
             const pubKeys = this.wkd.get(wkdHash)!;
 
-            // Concatenate all public keys into a single binary blob
-            const pubKeysBinary = Buffer.concat(
-                pubKeys
-                    .map(p => p.data.toPacketList().write())
-            );
-
             return res
                 .header("Content-Type", "application/octet-stream")
                 .header("X-Fingerprints", pubKeys.map(p => p.data.getFingerprint().toUpperCase()).join(","))
                 .status(200)
-                .send(pubKeysBinary);
+                .send(pubKeys.combineBinary());
         });
     }
 
@@ -43,7 +37,7 @@ export class Server {
 
         // Load keys
         await this.wkd.loadKeys();
-        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.length, 0);
+        const total = Array.from(this.wkd.values()).reduce((acc, val) => acc + val.size, 0);
         this.fastify.log.info(`Loaded ${total} keys of ${this.wkd.size} WKD entries`);
 
         // Start server

@@ -1,8 +1,9 @@
 import { emailRegex, mapFileURL, mapItemRegex, pubKeyURL, pubKeyEntry } from "../constants.js";
 import openpgp from "openpgp";
 import { Content, fetchContent } from "./util/fetchContent.js";
+import { PubKeySet } from "./PubKeySet.js";
 
-export class WKDEntryManager extends Map<EntryKey, Entry> {
+export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
     public async loadKeys(): Promise<void> {
         // Get pubKeys files and raw entries
         const keys = await WKDEntryManager.getKeysURL();
@@ -26,13 +27,13 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
             if (pubKeys.length === 0) continue;
 
             // Sort pubKeys by creation time (newest first)
-            this.set(entry, pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
+            this.set(entry, new PubKeySet(pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime())));
         }
     }
 
     public findEntryKey(fingerprint: string): EntryKey | undefined {
         for (const [entry, pubKeys] of this.entries()) {
-            if (pubKeys.some(p => p.data.getFingerprint().toUpperCase() === fingerprint.toUpperCase())) return entry;
+            if (pubKeys.hasFingerprint(fingerprint)) return entry;
         }
         return undefined;
     }
@@ -78,8 +79,3 @@ export class WKDEntryManager extends Map<EntryKey, Entry> {
 export type EntryKey = string;
 export type PublicKeyURL = URL;
 export type WKDRawEntry = Map<EntryKey, PublicKeyURL[]>;
-export interface PublicKeyData {
-    data: openpgp.PublicKey;
-    etag: string;
-}
-export type Entry = PublicKeyData[];
