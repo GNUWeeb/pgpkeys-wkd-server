@@ -1,6 +1,6 @@
 # pgpkeys-wkd-server
 
-A Simple HTTP Server to serve GNUWeeb's pgpkeys via [Web Key Directory](https://datatracker.ietf.org/doc/html/draft-koch-openpgp-webkey-service)
+A Simple HTTP Server to serve GNUWeeb's [pgpkeys](https://github.com/GNUWeeb/pgpkeys) via [Web Key Directory](https://datatracker.ietf.org/doc/html/draft-koch-openpgp-webkey-service)
 
 ## End-user usage
 Any OpenPGP client that supports WKD can use this server to fetch GNUWeeb's public key.
