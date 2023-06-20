@@ -1,9 +1,16 @@
 {
   "name": "pgpkeys-wkd-server",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "A Simple HTTP Server to serve GNUWeeb's pgpkeys via WKD",
   "license": "GPL-2.0",
   "author": "",
+  "contributors": [
+    {
+      "name": "Hazmi Alfarizqi",
+      "email": "contact@hzmi.xyz",
+      "url": "https://github.com/Hazmi35"
+    }
+  ],
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
