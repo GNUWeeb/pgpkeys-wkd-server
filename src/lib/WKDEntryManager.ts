@@ -1,7 +1,7 @@
 import { emailRegex, mapItemRegex, pubKeyEntry, branch, repository } from "../constants.js";
 import openpgp from "openpgp";
-import { Content, fetchContent } from "./util/fetchContent.js";
-import { PubKeySet } from "./PubKeySet.js";
+import { fetchContent } from "./util/fetchContent.js";
+import { PubKey, PubKeySet } from "./PubKeySet.js";
 import fetch from "node-fetch";
 
 export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
@@ -10,25 +10,16 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         const keys = await WKDEntryManager.getKeysURL();
 
         for (const [entry, pubKeysURLs] of keys.entries()) {
-            // Resolve pubKeysURL
-            const pubKeysData = (
-                await Promise.all(
-                    Array.from(pubKeysURLs)
-                        .map(url => fetchContent(url)) // Fetch the content
-                )
-            ).filter((data): data is Content => data !== null);
-
-            // Parse pubKeys
-            const pubKeys = await Promise.all(
-                pubKeysData
-                    .map(async ({ etag, data }) => ({ etag, data: await openpgp.readKey({ armoredKey: data }) })) // Parse the key
-            );
+            // Resolve pubKeysURL (Sorted by creation time - newest first)
+            const pubKeys = await Promise.all(Array.from(pubKeysURLs).map(url => WKDEntryManager.resolvePubKeyFile(url)))
+                .then(p => p.filter((d): d is PubKey => d !== null))
+                .then(p => p.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
 
             // Don't add entry if there are no keys
             if (pubKeys.length === 0) continue;
 
             // Sort pubKeys by creation time (newest first)
-            this.set(entry, new PubKeySet(pubKeys.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime())));
+            this.set(entry, new PubKeySet(pubKeys));
         }
     }
 
@@ -41,6 +32,13 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
 
     public hasPubKey(fingerprint: string): boolean {
         return this.findEntryKey(fingerprint) !== undefined;
+    }
+
+    public get pubKeySize(): number { return Array.from(this.values()).reduce((acc, val) => acc + val.size, 0); }
+
+    private static async resolvePubKeyFile(url: string): Promise<PubKey | null> {
+        const res = await fetchContent(url);
+        return res ? { etag: res.etag, data: await openpgp.readKey({ armoredKey: res.data }) } : null;
     }
 
     private static async getKeysURL(): Promise<WKDRawEntry> {
