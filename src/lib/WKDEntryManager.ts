@@ -18,8 +18,7 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
             // Don't add entry if there are no keys
             if (pubKeys.length === 0) continue;
 
-            // Sort pubKeys by creation time (newest first)
-            this.set(entry, new PubKeySet(pubKeys));
+            this.set(entry, new PubKeySet(pubKeys, entry));
         }
     }
 
