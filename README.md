@@ -42,6 +42,6 @@ $ docker run -d -p 3000:3000 --env-file .env --name pgpkeys-wkd-server ghcr.io/g
 OR you can use docker compose yourself.
 
 ### Notes
-Make sure to map a URL in `https://<EMAIL_DOMAIN>/.well-known/openpgpkey` to the server.
+Make sure to map a URL prefix in `https://<EMAIL_DOMAIN>/.well-known/openpgpkey` to the server (resulting path: `https://<EMAIL_DOMAIN>/.well-known/openpgpkey/hu/<wkd hash>`).
 
 For Docker, you can use something like [watchtower](https://github.com/containrrr/watchtower) to keep the server up to date.
