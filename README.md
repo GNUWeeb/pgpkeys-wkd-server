@@ -37,7 +37,7 @@ OR use any other process manager.
 ### Docker
 You could use Docker and skip installing Node.js and pnpm and cloning the repo.
 ```bash
-$ docker run -d --env-file .env --name pgpkeys-wkd-server ghcr.io/gnuweeb/pgpkeys-wkd-server:latest
+$ docker run -d -p 3000:3000 --env-file .env --name pgpkeys-wkd-server ghcr.io/gnuweeb/pgpkeys-wkd-server:latest
 ```
 OR you can use docker compose yourself.
 
