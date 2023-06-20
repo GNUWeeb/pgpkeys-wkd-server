@@ -39,7 +39,7 @@ export class Server {
         this.fastify.log.info("Hello! Loading keys and starting server...");
 
         // Load keys
-        await this.wkd.loadKeys();
+        await this.wkd.loadKeys(true);
         this.fastify.log.info(`Loaded ${this.wkd.pubKeySize} keys of ${this.wkd.size} WKD entries`);
 
         // Start server

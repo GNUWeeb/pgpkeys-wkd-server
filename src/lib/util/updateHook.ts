@@ -8,7 +8,7 @@ function filterKeyFiles(files: string[]): string[] {
     return files
         .filter(f => f.startsWith("keys/"))
         .map(f => f.substring("keys/".length))
-        .map(f => f.replace(/\.asc$/, ""));
+        .map(f => WKDEntryManager.filenameToFingerprint(f));
 }
 
 export async function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntryManager): Promise<any> {
@@ -33,50 +33,56 @@ export async function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WK
 
     const response = { ok: true, actions: [] as Record<string, any>[] };
 
-    if (toRemove.length > 0) {
-        const removed = toRemove.reduce<{ U?: string; F: string }[]>((acc, f) => {
-            const pubkey = wkd.deletePubKey(f);
-            if (pubkey) {
-                const user = pubkey.data.users.find(({ userID }) => emailRegex.test(userID?.email ?? ""))?.userID?.userID;
-                acc.push({ U: user, F: pubkey.data.getFingerprint().toUpperCase() });
-            }
-            return acc;
-        }, []);
-
-        if (removed.length !== 0) {
-            req.log.info({ removed }, `Removed keys, now it's ${wkd.pubKeySize} keys of ${wkd.size} WKD entries`);
-
-            response.actions.push({ action: "remove", keys: removed });
-        }
-    }
-
-    if (toModify.length > 0) {
-        const modified = await Promise.all(
-            toModify.filter(f => wkd.hasPubKey(f))
-                .map(async f => {
-                    const [oldPubKey, newPubKey] = await wkd.updatePubKey(f, commitHash);
-
-                    const oUsers = oldPubKey.data.getUserIDs();
-                    const nUsers = newPubKey.data.getUserIDs();
-                    const oExpiry = await oldPubKey.data.getExpirationTime();
-                    const nExpiry = await newPubKey.data.getExpirationTime();
-
-                    return {
-                        F: newPubKey.data.getFingerprint().toUpperCase(),
-                        O: { UIDs: oUsers, EXP: oExpiry },
-                        N: { UIDs: nUsers, EXP: nExpiry }
-                    };
-                })
-        );
-
-        if (modified.length !== 0) {
-            req.log.info({ modified }, "Modified keys");
-            response.actions.push({ action: "modify", keys: modified });
-        }
-    }
-
+    // Map.txt was modified, do a full update
     if (commits.some(({ modified }) => modified.includes("map.txt"))) {
-        // TODO: Do full update
+        const oldEntrySize = wkd.size;
+        const oldPKSize = wkd.pubKeySize;
+
+        await wkd.loadKeys(false, commitHash);
+
+        req.log.info(`Map.txt changed, now it's ${wkd.pubKeySize} keys of ${wkd.size} WKD entries`);
+        response.actions.push({ action: "reload", O: { E: oldEntrySize, PK: oldPKSize }, N: { E: wkd.size, PK: wkd.pubKeySize } });
+    } else {
+        if (toRemove.length > 0) {
+            const removed = toRemove.reduce<{ U?: string; F: string }[]>((acc, f) => {
+                const pubkey = wkd.deletePubKey(f);
+                if (pubkey) {
+                    const user = pubkey.data.users.find(({ userID }) => emailRegex.test(userID?.email ?? ""))?.userID?.userID;
+                    acc.push({ U: user, F: pubkey.data.getFingerprint().toUpperCase() });
+                }
+                return acc;
+            }, []);
+
+            if (removed.length !== 0) {
+                req.log.info({ removed }, `Removed keys, now it's ${wkd.pubKeySize} keys of ${wkd.size} WKD entries`);
+                response.actions.push({ action: "remove", keys: removed });
+            }
+        }
+
+        if (toModify.length > 0) {
+            const modified = await Promise.all(
+                toModify.filter(f => wkd.hasPubKey(f))
+                    .map(async f => {
+                        const [oldPubKey, newPubKey] = await wkd.updatePubKey(f, commitHash);
+
+                        const oUsers = oldPubKey.data.getUserIDs();
+                        const nUsers = newPubKey.data.getUserIDs();
+                        const oExpiry = await oldPubKey.data.getExpirationTime();
+                        const nExpiry = await newPubKey.data.getExpirationTime();
+
+                        return {
+                            F: newPubKey.data.getFingerprint().toUpperCase(),
+                            O: { UIDs: oUsers, EXP: oExpiry },
+                            N: { UIDs: nUsers, EXP: nExpiry }
+                        };
+                    })
+            );
+
+            if (modified.length !== 0) {
+                req.log.info({ modified }, "Modified keys");
+                response.actions.push({ action: "modify", keys: modified });
+            }
+        }
     }
 
     return response;
