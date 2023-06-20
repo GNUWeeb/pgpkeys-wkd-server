@@ -10,11 +10,9 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
         const keys = await WKDEntryManager.getKeysURL();
 
         for (const [entry, pubKeysURLs] of keys.entries()) {
-            // Resolve pubKeysURL (Sorted by creation time - newest first)
+            // Resolve pubKeysURL
             const pubKeys = await Promise.all(Array.from(pubKeysURLs).map(url => WKDEntryManager.resolvePubKeyFile(url)))
-                .then(p => p.filter((d): d is PubKey => d !== null))
-                .then(p => p.sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime()));
-
+                .then(p => p.filter((d): d is PubKey => d !== null));
             // Don't add entry if there are no keys
             if (pubKeys.length === 0) continue;
 
@@ -30,6 +28,20 @@ export class WKDEntryManager extends Map<EntryKey, PubKeySet> {
     }
 
     public hasPubKey(fingerprint: string): boolean { return this.findEntryKey(fingerprint) !== undefined; }
+
+    public async updatePubKey(fingerprint: string, commitHash: string): Promise<[OldPubKey: PubKey, NewPubKey: PubKey]> {
+        const pubKeys = this.get(this.findEntryKey(fingerprint)!);
+
+        const newPubKey = await WKDEntryManager.resolvePubKeyFile(WKDEntryManager.pubKeyURL(commitHash, `${fingerprint}.asc`));
+        if (!newPubKey) throw new Error(`Couldn't resolve pubKey for fingerprint ${fingerprint}`);
+
+        const oldPubKey = pubKeys?.deleteFingerprint(fingerprint);
+        if (!oldPubKey) throw new Error(`Couldn't find pubKey for fingerprint ${fingerprint}`);
+
+        // @ts-expect-error False positive, there is no way this can be undefined
+        pubKeys.add(oldPubKey);
+        return [oldPubKey, newPubKey];
+    }
 
     public deletePubKey(fingerprint: string): PubKey | undefined {
         const pubKeys = this.get(this.findEntryKey(fingerprint)!);

@@ -11,9 +11,9 @@ function filterKeyFiles(files: string[]): string[] {
         .map(f => f.replace(/\.asc$/, ""));
 }
 
-export function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntryManager): any {
+export async function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntryManager): Promise<any> {
     const { body, headers } = req as { body: PushEvent; headers: Record<string, string> };
-    const { commits, ref } = body;
+    const { commits, ref, after: commitHash } = body;
 
     // Check request headers and validity of the signature
     if (headers["content-type"] !== "application/json") return res.status(400).send({ ok: false, error: "Not JSON" });
@@ -31,8 +31,10 @@ export function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntry
     const toRemove = filterKeyFiles(commits.flatMap(({ removed }) => removed));
     const toModify = filterKeyFiles(commits.flatMap(({ modified }) => modified));
 
+    const response = { ok: true, actions: [] as Record<string, any>[] };
+
     if (toRemove.length > 0) {
-        const removed = toRemove.reduce<{ U: string | undefined; F: string }[]>((acc, f) => {
+        const removed = toRemove.reduce<{ U?: string; F: string }[]>((acc, f) => {
             const pubkey = wkd.deletePubKey(f);
             if (pubkey) {
                 const user = pubkey.data.users.find(({ userID }) => emailRegex.test(userID?.email ?? ""))?.userID?.userID;
@@ -41,20 +43,41 @@ export function updateHook(req: FastifyRequest, res: FastifyReply, wkd: WKDEntry
             return acc;
         }, []);
 
-        if (removed.length === 0) return { ok: true, action: null };
+        if (removed.length !== 0) {
+            req.log.info({ removed }, `Removed keys, now it's ${wkd.pubKeySize} keys of ${wkd.size} WKD entries`);
 
-        req.log.info({ removed }, `Removed keys, now it's ${wkd.pubKeySize} keys of ${wkd.size} WKD entries`);
-
-        return { ok: true, action: "remove", keys: removed };
+            response.actions.push({ action: "remove", keys: removed });
+        }
     }
 
-    if (toModify.some(f => !wkd.hasPubKey(f))) {
-        // TODO: Do modify
+    if (toModify.length > 0) {
+        const modified = await Promise.all(
+            toModify.filter(f => wkd.hasPubKey(f))
+                .map(async f => {
+                    const [oldPubKey, newPubKey] = await wkd.updatePubKey(f, commitHash);
+
+                    const oUsers = oldPubKey.data.getUserIDs();
+                    const nUsers = newPubKey.data.getUserIDs();
+                    const oExpiry = await oldPubKey.data.getExpirationTime();
+                    const nExpiry = await newPubKey.data.getExpirationTime();
+
+                    return {
+                        F: newPubKey.data.getFingerprint().toUpperCase(),
+                        O: { UIDs: oUsers, EXP: oExpiry },
+                        N: { UIDs: nUsers, EXP: nExpiry }
+                    };
+                })
+        );
+
+        if (modified.length !== 0) {
+            req.log.info({ modified }, "Modified keys");
+            response.actions.push({ action: "modify", keys: modified });
+        }
     }
 
     if (commits.some(({ modified }) => modified.includes("map.txt"))) {
         // TODO: Do full update
     }
 
-    return { ok: true, action: null };
+    return response;
 }

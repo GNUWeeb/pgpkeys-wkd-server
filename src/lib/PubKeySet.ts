@@ -32,7 +32,8 @@ export class PubKeySet extends Set<PubKey> {
     public combineBinary(): Buffer {
         return Buffer.concat(
             this.toArray()
-                .map(p => p.data.toPacketList().write())
+                .sort((a, b) => b.data.getCreationTime().getTime() - a.data.getCreationTime().getTime())
+                .map(k => k.data.toPacketList().write())
         );
     }
 }
