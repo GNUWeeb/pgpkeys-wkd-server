@@ -25,6 +25,9 @@ devDependencies:
   '@hazmi35/eslint-config':
     specifier: ^10.0.0
     version: 10.0.0(@eslint/js@8.43.0)(@typescript-eslint/eslint-plugin@5.59.11)(@typescript-eslint/parser@5.59.11)(eslint@8.43.0)(typescript@5.1.3)
+  '@octokit/webhooks-types':
+    specifier: ^7.0.3
+    version: 7.0.3
   '@types/node':
     specifier: ^20.3.1
     version: 20.3.1
@@ -182,6 +185,10 @@ packages:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
+    dev: true
+
+  /@octokit/webhooks-types@7.0.3:
+    resolution: {integrity: sha512-yDw/89TBaMotdT1/4gxVaiemBhswBd+jPazhL60/rS5WqXC6JZuj5CkDql7Dhc9vAbbkrJBkWsa2sppM/g8jxQ==}
     dev: true
 
   /@types/json-schema@7.0.12:

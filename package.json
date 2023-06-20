@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@hazmi35/eslint-config": "^10.0.0",
+    "@octokit/webhooks-types": "^7.0.3",
     "@types/node": "^20.3.1",
     "@typescript-eslint/eslint-plugin": "^5.59.11",
     "@typescript-eslint/parser": "^5.59.11",
