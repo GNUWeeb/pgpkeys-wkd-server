@@ -8,9 +8,9 @@ export class Server {
 
     public registerRoutes(): void {
         // We currently don't handle Web Key Directory Update Protocol, so empty string is fine.
-        this.fastify.get("/policy", () => "");
+        this.fastify.get("/.well-known/openpgpkey/policy", () => "");
 
-        this.fastify.head("/hu/:wkdHash", (req, res) => {
+        this.fastify.head("/.well-known/openpgpkey/hu/:wkdHash", (req, res) => {
             const { wkdHash } = req.params as { wkdHash: string };
 
             if (!this.wkd.has(wkdHash)) return res.status(404).send();
@@ -18,7 +18,7 @@ export class Server {
             return res.status(200).send();
         });
 
-        this.fastify.get("/hu/:wkdHash", (req, res) => {
+        this.fastify.get("/.well-known/openpgpkey/hu/:wkdHash", (req, res) => {
             const { wkdHash } = req.params as { wkdHash: string };
 
             if (!this.wkd.has(wkdHash)) return res.status(404).send();
@@ -32,7 +32,7 @@ export class Server {
                 .send(pubKeys.combineBinary());
         });
 
-        this.fastify.post("/internal/updateHook", (req, res) => updateHook(req, res, this.wkd));
+        this.fastify.post("/.well-known/openpgpkey/internal/updateHook", (req, res) => updateHook(req, res, this.wkd));
     }
 
     public async start(port: number, host = "0.0.0.0"): Promise<any> {
