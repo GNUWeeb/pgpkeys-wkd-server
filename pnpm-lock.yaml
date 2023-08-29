@@ -18,8 +18,8 @@ dependencies:
     specifier: ^3.3.1
     version: 3.3.1
   openpgp:
-    specifier: ^5.9.0
-    version: 5.9.0
+    specifier: ^5.10.1
+    version: 5.10.1
 
 devDependencies:
   '@hazmi35/eslint-config':
@@ -1116,8 +1116,8 @@ packages:
     dependencies:
       wrappy: 1.0.2
 
-  /openpgp@5.9.0:
-    resolution: {integrity: sha512-wEI6TAinCAq8ZLZA4oZ3ZtJ2BhhHj+CiPCd8TzE7zCicr0V8tvG5UF76OtddLLOJcK63w3Aj3KiRd+VLMScirQ==}
+  /openpgp@5.10.1:
+    resolution: {integrity: sha512-SR5Ft+ej51d0+p53ld5Ney0Yiz0y8Mh1YYLJrvpRMbTaNhvS1QcDX0Oq1rW9sjBnQXtgrpWw2Zve3rm7K5C/pw==}
     engines: {node: '>= 8.0.0'}
     dependencies:
       asn1.js: 5.4.1
