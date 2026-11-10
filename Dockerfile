@@ -1,35 +1,35 @@
-FROM ghcr.io/hazmi35/node:lts-dev-alpine as build-stage
+# Base images are pinned by the digest of their multi-platform index, so
+# a rebuild uses the same bits until someone bumps both tag and digest.
+FROM docker.io/library/golang:1.27.3-trixie@sha256:af1bfc2614ebb1dbd31af514b78740fd678850e76498762b425ecee4c5c6ea80 AS build
 
-# Prepare pnpm with corepack (experimental feature)
-RUN corepack enable && corepack prepare pnpm@latest
+WORKDIR /src
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 
-# Copy package.json, lockfile and npm config files
-COPY package.json pnpm-lock.yaml *.npmrc  ./
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-# Fetch dependencies to virtual store
-RUN pnpm fetch
+COPY cmd ./cmd
+COPY internal ./internal
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -trimpath -ldflags "-s -w" -o /out/matcha ./cmd/matcha
 
-# Install dependencies
-RUN pnpm install --offline --frozen-lockfile
+FROM docker.io/library/debian:13.7-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 
-# Copy Project files
-COPY . .
+# A fixed uid, so a volume mounted for matcha has a known owner.
+ARG MATCHA_UID=10001
 
-# Build TypeScript Project
-RUN pnpm run build
+RUN groupadd --system --gid ${MATCHA_UID} matcha \
+ && useradd --system --uid ${MATCHA_UID} --gid matcha --no-create-home \
+      --home-dir /nonexistent --shell /usr/sbin/nologin matcha
 
-# Prune devDependencies
-RUN pnpm prune --production
+COPY --from=build /out/matcha /usr/local/bin/matcha
 
-# Get ready for production
-FROM ghcr.io/hazmi35/node:lts-alpine
+# Inside the container both listeners bind every interface; publish the
+# WKD port only where the nginx in front of the mail domain reaches it.
+ENV WKD_ADDR=:8080 DASHBOARD_ADDR=:8081
+EXPOSE 8080/tcp 8081/tcp
 
-# Copy needed files
-COPY --from=build-stage /tmp/build/package.json .
-COPY --from=build-stage /tmp/build/node_modules ./node_modules
-COPY --from=build-stage /tmp/build/dist ./dist
-
-EXPOSE 3000/tcp
-
-# Start the app with node
-CMD ["node", "dist/index.js"]
+USER matcha
+ENTRYPOINT ["/usr/local/bin/matcha"]
