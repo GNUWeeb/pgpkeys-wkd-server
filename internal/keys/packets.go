@@ -10,6 +10,7 @@ import (
 type rawPacket struct {
 	tag int
 	raw []byte
+	hdr int // length of the header; raw[hdr:] is the body
 }
 
 var errMalformed = errors.New("the key data is malformed")
@@ -72,7 +73,7 @@ func splitPackets(data []byte) ([]rawPacket, error) {
 			return nil, errMalformed
 		}
 		n := hlen + blen
-		pkts = append(pkts, rawPacket{tag: tag, raw: data[:n:n]})
+		pkts = append(pkts, rawPacket{tag: tag, raw: data[:n:n], hdr: hlen})
 		data = data[n:]
 	}
 	if len(pkts) == 0 {
