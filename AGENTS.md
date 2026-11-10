@@ -4,7 +4,7 @@
 
 `matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and gives members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: phases 1 to 6 of `ROADMAP.md` are implemented in this repository; the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
+**Status: phases 1 to 7 of `ROADMAP.md` are implemented in this repository (phase 8 is deferred); the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
 
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
@@ -30,6 +30,8 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 **Reminders** (`internal/reminder`): `Loop` runs `Run` at start and then every 24 hours. `Run` checks every stored key and mails its address 30, 10 and 3 days before `SigningUntil` (thresholds in `reminder.go`, the longest is `keys.ExpiryNotice`), once per date and threshold; a new date starts over, a failed mail is retried on the next run, and keys that already cannot sign are only logged.
 
+**Keyring export** (`internal/export`, `matcha export DIR` in `main.go`): `export.Write` puts each stored fingerprint, from its latest upload, into `keys/<FPR>.asc` (armored, as uploaded) or, when its primary key has expired and it is not revoked, `keys/expired/<FPR>.asc`. It rewrites a file only when its bytes differ, removes key files (fingerprint-named `.asc`) of keys no longer stored, and never touches other files. The command needs only `DATABASE_PATH` (`config.DatabasePath`) and refuses a missing database file, since an empty database would export as "remove everything".
+
 **WKD hash** (`wkd.Hash`): the local-part with only ASCII upper case lower-cased, SHA-1, z-base-32; tested against the draft's vector and two kernel.org entries.
 
 **Login** (`internal/web`, see `login.go`):
@@ -53,6 +55,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 - `cmd/matcha/` - the binary: wiring, signal handling, server lifecycle.
 - `internal/config/` - settings from the environment.
+- `internal/export/` - the keyring export.
 - `internal/keys/` - upload checks, the WKD view and the usability rule; `testdata/` holds a DSA key made with GnuPG.
 - `internal/mail/` - SMTP client.
 - `internal/reminder/` - the daily key check and expiry reminder mails.
@@ -70,6 +73,7 @@ go build -o matcha ./cmd/matcha   # build the binary (gitignored)
 go vet ./... && go test ./...     # the gate
 go tool templ generate            # after editing internal/web/ui/*.templ
 go run ./cmd/matcha               # run with settings from the environment
+go run ./cmd/matcha export DIR    # write the keyring into DIR (needs DATABASE_PATH)
 docker build -t matcha .          # image; podman build works the same
 docker compose up -d --build      # the deployment in compose.yaml (needs .env)
 ```
@@ -88,7 +92,8 @@ Configuration is read from the environment only; the binary does not read `.env`
 ## Important Files
 
 - `ROADMAP.md` - plan for the rewrite: goal, decisions, kernel.org reference model, WKD behaviour, phases, open items.
-- `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
+- `cmd/matcha/main.go` - entry point, listeners, graceful shutdown, the `export` command.
+- `internal/export/export.go` - `Write`, the keyring layout.
 - `internal/config/config.go` - every environment variable and its default.
 - `internal/keys/keys.go` - `Parse` and `wkdView`; `health.go` - `Check` and the policy; `describe.go` - `Describe`; `packets.go` splits raw packets.
 - `internal/reminder/reminder.go` - reminder thresholds, the mail text, `Loop` and `Run`.

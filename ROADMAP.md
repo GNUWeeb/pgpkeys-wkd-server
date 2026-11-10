@@ -197,6 +197,8 @@ Status: done 2026-11-11, in Go (see the decision on the key-health checker). `ke
 - Write `keys/<FINGERPRINT>.asc` (and `keys/expired/`) from the store into a local directory laid out like kernel.org's `pgpkeys.git`, so `gpg --import keys/*.asc` works on it. Armored, all User IDs and certifications as stored; the same store gives the same bytes, so an unchanged store produces no diff.
 - No git operations and no signing key: the export runs and is tested on its own.
 
+Status: done 2026-11-11. `matcha export DIR` writes the export; README's "Keyring export" describes it. Decided here: file names keep the full fingerprint, as `GNUWeeb/pgpkeys` has them today (kernel.org uses the 16-digit key ID); `keys/expired/` takes keys whose primary key has expired, the test kernel.org's `korg-move-expired.py` applies; revoked keys stay in `keys/` so that importing the keyring spreads the revocation (kernel.org removes them by hand); a key stored for several addresses is written once, from its latest upload; files the export does not own are left alone, since phase 8 decides what happens to `map.txt` and `genmap.py`. Checked: on a local instance with three uploaded keys, the export wrote three files, a second run changed nothing, a missing database was refused, and GnuPG 2.4.9 in a fresh `GNUPGHOME` imported all three from `keys/*.asc`; the image runs the command too.
+
 ### 8. Keyring publishing
 
 - Commit the export to `GNUWeeb/pgpkeys` with signed commits and push it, so the repository follows the store.
