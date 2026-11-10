@@ -1,0 +1,36 @@
+# matcha behind the nginx on the same host. Settings come from .env
+# (copy .env.example; it holds the SMTP password, so keep it private).
+#
+#   docker compose up -d --build
+#
+# Both ports are published on loopback only: the host's nginx proxies
+# https://gnuweeb.org/.well-known/openpgpkey/ to 8080 and
+# https://pgp.gnuweeb.org to 8081 (deploy/nginx/). The database lives
+# on the matcha-data volume.
+name: matcha
+
+services:
+  matcha:
+    build: .
+    image: matcha
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # The nginx in front sets X-Real-IP; with the ports on loopback
+      # nothing else can reach the dashboard to forge it.
+      REAL_IP_HEADER: X-Real-IP
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - matcha-data:/var/lib/matcha
+    # matcha needs no privilege and writes only to its volume.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+
+volumes:
+  matcha-data:

@@ -63,6 +63,28 @@ docker run -d --env-file .env -v matcha-data:/var/lib/matcha \
 
 Inside the container both listeners bind every interface (`WKD_ADDR=:8080`, `DASHBOARD_ADDR=:8081`); choose with `-p` where each port is reachable. The database lives at `/var/lib/matcha/matcha.db` on the image's volume; keep that volume across upgrades.
 
+### Deployment
+
+The intended setup for GNUWeeb: matcha in a container on the host that runs the nginx for `gnuweeb.org` and `pgp.gnuweeb.org`, both ports on loopback.
+
+1. **DNS**: an `A`/`AAAA` record for `pgp.gnuweeb.org`. Keep `openpgpkey.gnuweeb.org` without any record and out of any wildcard: clients that find an address for it use the advanced WKD method, which matcha does not serve, and never fall back to `gnuweeb.org`.
+2. **TLS**: a certificate for `pgp.gnuweeb.org` (the dashboard's cookies need HTTPS); `gnuweeb.org` already has one.
+3. **Settings**: copy `.env.example` to `.env` next to `compose.yaml`, set the SMTP settings for `pgp@gnuweeb.org` and `chmod 600 .env`. The defaults of `EMAIL_DOMAIN` and `BASE_URL` already fit; `compose.yaml` sets `REAL_IP_HEADER`.
+4. **Start**: `docker compose up -d --build` (or `podman compose`). The container runs as uid 10001 with a read-only root file system and no capabilities; the database is on the `matcha-data` volume.
+5. **nginx**: [`deploy/nginx/gnuweeb.org.conf`](deploy/nginx/gnuweeb.org.conf) shows what the `gnuweeb.org` server block needs: the whole `/.well-known/openpgpkey/` prefix proxied to `127.0.0.1:8080`, matched before the redirect to `www.gnuweeb.org`. [`deploy/nginx/pgp.gnuweeb.org.conf`](deploy/nginx/pgp.gnuweeb.org.conf) is the dashboard's server block, proxying to `127.0.0.1:8081`. Both are examples; adapt the certificate paths.
+6. **Check** from another machine:
+
+   ```bash
+   curl -sI https://gnuweeb.org/.well-known/openpgpkey/policy   # 200
+   host openpgpkey.gnuweeb.org                                   # must not resolve
+   ```
+
+   then log in at `https://pgp.gnuweeb.org`, add a key, and in a fresh `GNUPGHOME` run `gpg --auto-key-locate clear,wkd,nodefault --locate-keys you@gnuweeb.org`.
+
+The directory starts empty: members upload their own keys through the dashboard. To back up, stop the container (`docker compose stop`) and copy the volume's `matcha.db`; the database runs in WAL mode, so a copy taken while it runs can miss recent writes.
+
+Upgrade with `git pull && docker compose up -d --build`; the schema is migrated at startup, and an older binary refuses a database written by a newer one.
+
 ## WKD
 
 The WKD listener serves the direct method: `GET` and `HEAD` on `/.well-known/openpgpkey/hu/<hash>` and `GET /.well-known/openpgpkey/policy`. The nginx in front of the mail domain must proxy the whole `/.well-known/openpgpkey/` prefix to it, ahead of any redirect. Each served key keeps all of its User IDs but none of the certifications made by other keys.
