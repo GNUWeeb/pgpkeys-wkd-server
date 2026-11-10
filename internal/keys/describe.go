@@ -1,12 +1,8 @@
 package keys
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"time"
-
-	"github.com/ProtonMail/go-crypto/openpgp"
 )
 
 // Info is what the dashboard shows about a stored key.
@@ -23,14 +19,10 @@ type Info struct {
 
 // Describe reads a key stored by Parse.
 func Describe(data []byte, now time.Time) (Info, error) {
-	ents, err := openpgp.ReadKeyRing(bytes.NewReader(data))
+	ent, err := readKey(data)
 	if err != nil {
 		return Info{}, err
 	}
-	if len(ents) != 1 {
-		return Info{}, errors.New("not exactly one key")
-	}
-	ent := ents[0]
 	info := Info{
 		Fingerprint: fmt.Sprintf("%X", ent.PrimaryKey.Fingerprint),
 		Created:     ent.PrimaryKey.CreationTime,
@@ -45,12 +37,15 @@ func Describe(data []byte, now time.Time) (Info, error) {
 		if p.tag != tagUserID {
 			continue
 		}
-		id := string(p.raw[p.hdr:])
-		if ent.Identities[id] != nil {
-			info.UserIDs = append(info.UserIDs, id)
+		id := ent.Identities[string(p.raw[p.hdr:])]
+		if id == nil {
+			continue
+		}
+		if _, err := id.LatestValidSelfCertification(time.Time{}, permissive); err == nil {
+			info.UserIDs = append(info.UserIDs, id.Name)
 		}
 	}
-	if sig, _ := ent.PrimarySelfSignature(); sig != nil && sig.KeyLifetimeSecs != nil && *sig.KeyLifetimeSecs > 0 {
+	if sig, _ := ent.PrimarySelfSignature(time.Time{}, permissive); sig != nil && sig.KeyLifetimeSecs != nil && *sig.KeyLifetimeSecs > 0 {
 		info.Expires = info.Created.Add(time.Duration(*sig.KeyLifetimeSecs) * time.Second)
 		info.Expired = now.After(info.Expires)
 	}

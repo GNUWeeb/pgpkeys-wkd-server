@@ -4,15 +4,16 @@ package keys
 
 import (
 	"bytes"
+	"crypto"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 )
 
 // MaxSize caps an uploaded key, armored or binary.
@@ -77,14 +78,10 @@ func Parse(input []byte, address string) (*Key, error) {
 		return nil, errors.New("the data does not start with a public key")
 	}
 
-	ents, err := openpgp.ReadKeyRing(bytes.NewReader(data))
+	ent, err := readKey(data)
 	if err != nil {
 		return nil, fmt.Errorf("the key cannot be read: %w", err)
 	}
-	if len(ents) != 1 {
-		return nil, errors.New("the key cannot be read")
-	}
-	ent := ents[0]
 	if !hasAddress(ent, address) {
 		return nil, fmt.Errorf("the key has no valid, unrevoked User ID with the address %s", address)
 	}
@@ -124,12 +121,37 @@ func dearmor(input []byte) ([]byte, error) {
 	return data, nil
 }
 
+// permissive judges signatures by their cryptography alone: no hash or
+// public key algorithm is refused. go-crypto caches the outcome of each
+// signature check in the parsed key, so a key read for one config must not
+// be checked with another.
+var permissive = &packet.Config{
+	RejectHashAlgorithms:      map[crypto.Hash]bool{},
+	RejectPublicKeyAlgorithms: map[packet.PublicKeyAlgorithm]bool{},
+	RejectCurves:              map[packet.Curve]bool{},
+	MinRSABits:                1,
+}
+
+// readKey parses the one key in data.
+func readKey(data []byte) (*openpgp.Entity, error) {
+	ents, err := openpgp.ReadKeyRing(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if len(ents) != 1 {
+		return nil, errors.New("not exactly one key")
+	}
+	return ents[0], nil
+}
+
 // hasAddress reports whether ent has a self-signed, unrevoked User ID
 // whose mail address is address, compared case-insensitively.
-// openpgp.ReadKeyRing only lists User IDs with a valid self-signature.
 func hasAddress(ent *openpgp.Entity, address string) bool {
 	for _, id := range ent.Identities {
-		if len(id.Revocations) == 0 && strings.EqualFold(userIDAddress(id.UserId), address) {
+		if !strings.EqualFold(userIDAddress(id.UserId), address) {
+			continue
+		}
+		if _, err := id.Verify(time.Time{}, permissive); err == nil {
 			return true
 		}
 	}

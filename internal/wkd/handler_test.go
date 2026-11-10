@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
