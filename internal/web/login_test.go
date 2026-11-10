@@ -68,10 +68,11 @@ func newHarness(t *testing.T) *harness {
 // newClient is a browser of its own: a cookie jar, no redirects followed.
 func (h *harness) newClient() *http.Client {
 	jar, _ := cookiejar.New(nil)
-	c := h.ts.Client()
+	// ts.Client returns one shared client; copy it so each has its jar.
+	c := *h.ts.Client()
 	c.Jar = jar
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return c
+	return &c
 }
 
 func (h *harness) cookie(c *http.Client, name string) string {
