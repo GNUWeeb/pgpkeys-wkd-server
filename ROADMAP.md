@@ -42,7 +42,7 @@ Settled by the maintainer on 2026-11-11:
 | Rename | Yes, as part of the rewrite, to `matcha`. Renaming the GitLab project changes the URL given in the handover, so that step needs the owner's agreement. |
 | Language | Go, with `github.com/ProtonMail/go-crypto` for OpenPGP and templ, chi and htmx for the dashboard (greentea's stack). Bun and Rust with Sequoia were considered and dropped. |
 | Storage | SQLite: one file, no extra service. |
-| Key-health checker | `sq` (Sequoia) run as a subprocess, as kernel.org's scripts do. Debian 13 packages `sq` 1.3.1. |
+| Key-health checker | Go, in the service, with go-crypto's v2 API and its policy settings (decided 2026-11-11, replacing `sq`). kernel.org runs `sq inspect` (`pgpkey-expiry.py` in `pgpkeys.git`), but `sq` 1.3.1 has no machine-readable output for it, adds a 22 MB binary and its libraries to the image, and its text changes between releases. Accepted cost: the rule follows Sequoia's standard policy as listed in phase 6, not its every date-dependent detail. |
 | Go module path | `git.gnuweeb.net/GNUWeeb/matcha`, the URL the project gets once renamed. |
 | Listeners | Two addresses: `WKD_ADDR` for the WKD routes, reachable only by the `gnuweeb.org` nginx, and `DASHBOARD_ADDR` for `pgp.gnuweeb.org`. Dashboard routes do not exist on the WKD listener and the reverse. |
 | Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
@@ -123,7 +123,7 @@ The store keeps each key as submitted, including third-party certifications (nee
 
 Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 9 are the kernel.org-style additions.
 
-Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 9 are not to be started until asked for. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8; the next work is chosen from phases 6, 7 and 9.
+Current scope (maintainer, 2026-11-11): phases 6, 7 and 9, after phases 1 to 5. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8.
 
 ### 1. Tooling and rename
 
