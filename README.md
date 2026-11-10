@@ -85,6 +85,12 @@ The directory starts empty: members upload their own keys through the dashboard.
 
 Upgrade with `git pull && docker compose up -d --build`; the schema is migrated at startup, and an older binary refuses a database written by a newer one.
 
+### Keyring export
+
+`matcha export DIR` writes every stored key into `DIR/keys/<FINGERPRINT>.asc`, armored, with all of its User IDs and certifications: the layout of kernel.org's `pgpkeys.git`. Keys whose primary key has expired go to `DIR/keys/expired/`, so that old signatures can still be checked; revoked keys stay in `DIR/keys/`, so that importing the keyring brings their revocations. A key stored for several addresses is written once, from its latest upload.
+
+Run it as often as you like: it rewrites only files whose content changed, deletes the files of keys that are no longer stored, leaves every other file in `DIR` alone, and prints each change as `write <path>` or `remove <path>`. It reads only `DATABASE_PATH` and refuses a database file that does not exist. With compose: `docker compose exec matcha matcha export /var/lib/matcha/pgpkeys`. Import the result with `gpg --import DIR/keys/*.asc`. Committing the export to `GNUWeeb/pgpkeys` is not done yet (phase 8 of the roadmap).
+
 ## WKD
 
 The WKD listener serves the direct method: `GET` and `HEAD` on `/.well-known/openpgpkey/hu/<hash>` and `GET /.well-known/openpgpkey/policy`. The nginx in front of the mail domain must proxy the whole `/.well-known/openpgpkey/` prefix to it, ahead of any redirect. Each served key keeps all of its User IDs but none of the certifications made by other keys.
