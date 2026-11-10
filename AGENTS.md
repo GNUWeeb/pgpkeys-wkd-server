@@ -4,7 +4,7 @@
 
 `matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and gives members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: phases 1 to 7 of `ROADMAP.md` are implemented in this repository (phase 8 is deferred); the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
+**Status: phases 1 to 7 and 9 of `ROADMAP.md` are implemented in this repository (phase 8 is deferred); the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
 
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
@@ -26,6 +26,8 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 **Key health** (`health.go`): `keys.Check(data, now)` applies kernel.org's usability rule (what `sq` accepts) through go-crypto's policy (`policy`): a key is usable when its primary key is valid and at least one key may sign; self-signatures with MD5, SHA-1 or RIPEMD-160 do not count; DSA, ElGamal, RSA under 2048 bits and refused curves cannot sign. It returns `Usable`, `SigningUntil` (the latest end of a usable signing key, each capped by the primary key's expiry, as kernel.org's `pgpkey-expiry.py` computes it) and `Problems`, each with the fix and the GnuPG commands. go-crypto caches each signature's verdict in the parsed key, including expiry at the time asked, so `Check` reads the key three times and asks each copy one kind of question; keep it that way. `permissive` (in `keys.go`) judges signatures without any algorithm policy, for listing User IDs. GnuPG 2.4 keeps the hash of a self-signature it replaces, so the commands that repair a weak hash pass `--cert-digest-algo SHA512`.
 
+**Certifications** (`certs.go`): `keys.Certifications(data, signers, now)` returns the third-party certifications on a key's User IDs made by one of `signers` (stored keys), keeping those that verify, pass the hash policy, have not expired and are not revoked by a later revocation from the same signer; certifications by other keys are only counted. It matches issuers by fingerprint or key ID before reading a signer, so it reads only the signers it needs.
+
 **Store** (`internal/store`): table `keys`, unique on `(address, fingerprint)`; re-uploading a key replaces it and keeps its row ID. `wkd_hash` is derived from the address inside `PutKey`, never passed in. Addresses are stored as given, so callers normalize them first. `expiry_reminders` holds, per key row (deleted with it), the date and threshold of the last reminder mailed. Schema changes are appended to `migrations` in `store.go` (tracked by `PRAGMA user_version`); never edit a released migration.
 
 **Reminders** (`internal/reminder`): `Loop` runs `Run` at start and then every 24 hours. `Run` checks every stored key and mails its address 30, 10 and 3 days before `SigningUntil` (thresholds in `reminder.go`, the longest is `keys.ExpiryNotice`), once per date and threshold; a new date starts over, a failed mail is retried on the next run, and keys that already cannot sign are only logged.
@@ -45,7 +47,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 **Mail** (`internal/mail`): `net/smtp` with `SMTP_TLS` `starttls` (required, not opportunistic), `implicit` or `none`; `PLAIN` auth when a username is set. Plain-text body, CRLF, header values checked for CR/LF.
 
-**Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422, a `*keys.Unusable` with its fix and commands. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked, and the `Health` from `keys.Check`); keys with problems get a "What to fix" notice below the table. Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
+**Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422, a `*keys.Unusable` with its fix and commands. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked, and the `Health` from `keys.Check`); keys with problems get a "What to fix" notice below the table. Each User ID shows the members whose keys certified it (`keys.Certifications` against every stored key, named by the addresses they are stored for). Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
 
 **Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate. Every page works without JavaScript; htmx (`hx-boost` on `<body>`) only swaps pages in place. Its config (`htmxConfig` in `layout.templ`) disables eval and inline styles, as the CSP requires, and swaps 4xx/5xx responses so form errors show.
 
@@ -95,7 +97,7 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `cmd/matcha/main.go` - entry point, listeners, graceful shutdown, the `export` command.
 - `internal/export/export.go` - `Write`, the keyring layout.
 - `internal/config/config.go` - every environment variable and its default.
-- `internal/keys/keys.go` - `Parse` and `wkdView`; `health.go` - `Check` and the policy; `describe.go` - `Describe`; `packets.go` splits raw packets.
+- `internal/keys/keys.go` - `Parse` and `wkdView`; `health.go` - `Check` and the policy; `certs.go` - `Certifications`; `describe.go` - `Describe`; `packets.go` splits raw packets.
 - `internal/reminder/reminder.go` - reminder thresholds, the mail text, `Loop` and `Run`.
 - `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions; `reminders.go` - reminder state.
 - `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `keys.go`, `session.go`, `csrf.go`, `ratelimit.go`, `assets.go`.
