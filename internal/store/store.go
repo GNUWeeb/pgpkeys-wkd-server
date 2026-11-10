@@ -31,6 +31,20 @@ var migrations = []string{
 		UNIQUE (address, fingerprint)
 	);
 	CREATE INDEX keys_wkd_hash ON keys (wkd_hash);`,
+	`CREATE TABLE login_tokens (
+		hash       BLOB    PRIMARY KEY,
+		address    TEXT    NOT NULL,
+		created_at INTEGER NOT NULL,
+		expires_at INTEGER NOT NULL,
+		used_at    INTEGER
+	);
+	CREATE INDEX login_tokens_address ON login_tokens (address, created_at);
+	CREATE TABLE sessions (
+		hash       BLOB    PRIMARY KEY,
+		address    TEXT    NOT NULL,
+		created_at INTEGER NOT NULL,
+		expires_at INTEGER NOT NULL
+	);`,
 }
 
 // Open opens or creates the database at path and brings its schema up to

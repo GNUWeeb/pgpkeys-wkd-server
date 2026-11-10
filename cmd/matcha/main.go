@@ -15,7 +15,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/config"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/mail"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/web"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
 
@@ -42,11 +44,19 @@ func run(log *slog.Logger) error {
 	}
 	defer st.Close()
 
+	dash := web.New(web.Options{
+		Domain:       cfg.EmailDomain,
+		BaseURL:      cfg.BaseURL,
+		RealIPHeader: cfg.RealIPHeader,
+	}, st, mail.New(cfg.SMTP), log)
+
 	servers := []*http.Server{
 		newServer(cfg.WKDAddr, wkd.NewHandler(st, log)),
-		newServer(cfg.DashboardAddr, http.NewServeMux()),
+		newServer(cfg.DashboardAddr, dash),
 	}
-	return serve(ctx, log, servers)
+	err = serve(ctx, log, servers)
+	dash.Wait()
+	return err
 }
 
 func newServer(addr string, h http.Handler) *http.Server {

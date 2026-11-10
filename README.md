@@ -30,13 +30,21 @@ go build -o matcha ./cmd/matcha
 
 ### Configuration
 
-matcha reads its settings from the environment. `.env.example` lists them with their defaults; copy it to `.env` and edit it.
+matcha reads its settings from the environment. `.env.example` lists them with their defaults; copy it to `.env`, fill in the SMTP settings and keep the file private (it holds the SMTP password).
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `WKD_ADDR` | `127.0.0.1:8080` | Listen address of the WKD routes |
 | `DASHBOARD_ADDR` | `127.0.0.1:8081` | Listen address of the dashboard |
 | `DATABASE_PATH` | `matcha.db` | SQLite database file, created if missing |
+| `EMAIL_DOMAIN` | `gnuweeb.org` | Mail domain whose members log in and whose keys are served |
+| `BASE_URL` | `https://pgp.gnuweeb.org` | Public URL of the dashboard; mailed login links point below it |
+| `REAL_IP_HEADER` | (none) | Header with the client address set by the reverse proxy, for the per-client rate limit |
+| `SMTP_HOST` | (required) | SMTP server for login mails |
+| `SMTP_TLS` | `starttls` | `starttls`, `implicit` or `none` (local mail catcher only) |
+| `SMTP_PORT` | `587`, or `465` with `implicit` | SMTP port |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | (none) | SMTP credentials; both or neither |
+| `MAIL_FROM` | `pgp@` + `EMAIL_DOMAIN` | Sender of login mails |
 
 ### Running
 
@@ -58,6 +66,10 @@ Inside the container both listeners bind every interface (`WKD_ADDR=:8080`, `DAS
 ## WKD
 
 The WKD listener serves the direct method: `GET` and `HEAD` on `/.well-known/openpgpkey/hu/<hash>` and `GET /.well-known/openpgpkey/policy`. The nginx in front of the mail domain must proxy the whole `/.well-known/openpgpkey/` prefix to it, ahead of any redirect. Each served key keeps all of its User IDs but none of the certifications made by other keys.
+
+## Dashboard
+
+Members log in at `BASE_URL` with their address: matcha mails them a link that works once, for 15 minutes, and the link's page asks for a button press before it logs them in, so mail scanners that open links do not use it up. A session lasts 7 days or until logout. At most 5 links per hour are mailed to one address, and one client may ask for 20 per hour. The dashboard sets its cookies with the `__Host-` prefix, which needs HTTPS (browsers make an exception for `http://localhost`).
 
 ## License
 
