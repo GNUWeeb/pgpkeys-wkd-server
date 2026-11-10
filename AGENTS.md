@@ -14,11 +14,11 @@
 One process, two HTTP listeners, one SQLite database:
 
 ```
-cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown
+cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.New(..., mail.New(SMTP)) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown -> wait for login mails in flight
 ```
 
 - **WKD listener** (`WKD_ADDR`, `wkd.NewHandler`): `GET`/`HEAD /.well-known/openpgpkey/hu/<hash>` returns the WKD views of every key stored under that hash, concatenated newest first (key creation time), as `application/octet-stream`; 404 when there is none or the hash is malformed. `?l=` is ignored. `GET /.well-known/openpgpkey/policy` is one comment line. Only the nginx in front of `gnuweeb.org` is meant to reach this listener.
-- **Dashboard listener** (`DASHBOARD_ADDR`): will serve `pgp.gnuweeb.org`. Today it answers 404 to everything.
+- **Dashboard listener** (`DASHBOARD_ADDR`, `web.New`, chi router): login by mailed link; after login a placeholder start page.
 
 `serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
 
@@ -28,12 +28,27 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> one h
 
 **WKD hash** (`wkd.Hash`): the local-part with only ASCII upper case lower-cased, SHA-1, z-base-32; tested against the draft's vector and two kernel.org entries.
 
+**Login** (`internal/web`, see `login.go`):
+
+1. `POST /login` takes an address, which `normalizeAddress` checks (ASCII dot-atom local-part, domain `EMAIL_DOMAIN`) and lower-cases. Every valid address gets the same "check your mail" page: the mail goes out in a goroutine (`sendLink`, tracked by `Server.Wait`), and an address past its limit (5 links per hour, counted in `login_tokens`) silently gets none. A client past 20 requests per hour (in-memory `limiter`, keyed by `REAL_IP_HEADER` or the remote address) gets 429.
+2. The mail links to `BASE_URL/login/confirm?token=<43 chars>` (256 random bits). Tokens and session IDs are stored only as SHA-256 hashes (`hashSecret`).
+3. `GET /login/confirm` checks the token without using it and shows a button; `POST /login/confirm` uses it (`UseLoginToken`, an atomic `UPDATE ... RETURNING`), so a mail scanner opening the link does not log anyone in. Tokens live 15 minutes and work once.
+4. The session cookie `__Host-matcha-session` (`Secure`, `HttpOnly`, `SameSite=Lax`, 7 days) maps to a `sessions` row; `POST /logout` deletes the row.
+
+**CSRF** (`csrf.go`): double submit. A `__Host-matcha-csrf` cookie exists from the first response on; every non-GET request must carry the same value in the `csrf_token` form field or the `X-CSRF-Token` header, else 403. The same middleware caps request bodies at 2 MiB. **Security headers** (`securityHeaders` in `web.go`): strict CSP (`'self'` only, no inline script or style), `Referrer-Policy: no-referrer` (keeps tokens out of Referer), `X-Frame-Options: DENY`, `Cache-Control: no-store`.
+
+**Mail** (`internal/mail`): `net/smtp` with `SMTP_TLS` `starttls` (required, not opportunistic), `implicit` or `none`; `PLAIN` auth when a username is set. Plain-text body, CRLF, header values checked for CR/LF.
+
+**Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate.
+
 ## Key Directories
 
 - `cmd/matcha/` - the binary: wiring, signal handling, server lifecycle.
 - `internal/config/` - settings from the environment.
 - `internal/keys/` - upload checks and the WKD view.
+- `internal/mail/` - SMTP client.
 - `internal/store/` - SQLite database and migrations.
+- `internal/web/` - dashboard handlers and middleware; `internal/web/ui/` - templ components.
 - `internal/wkd/` - WKD hash and HTTP routes.
 
 There is no `scripts/` or `docs/` directory.
@@ -43,11 +58,12 @@ There is no `scripts/` or `docs/` directory.
 ```bash
 go build -o matcha ./cmd/matcha   # build the binary (gitignored)
 go vet ./... && go test ./...     # the gate
+go tool templ generate            # after editing internal/web/ui/*.templ
 go run ./cmd/matcha               # run with settings from the environment
 docker build -t matcha .          # image; podman build works the same
 ```
 
-Configuration is read from the environment only; the binary does not read `.env`. For a local run: `set -a; . ./.env; set +a; go run ./cmd/matcha`. Docker: `docker run --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 matcha`.
+Configuration is read from the environment only; the binary does not read `.env`. `SMTP_HOST` is required; everything else has a default (`internal/config/config.go`). For a local run: `set -a; . ./.env; set +a; go run ./cmd/matcha`. Docker: `docker run --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 matcha`. The session and CSRF cookies are `Secure`; browsers accept them on `http://localhost`, other clients may need HTTPS (the tests use `httptest.NewTLSServer`).
 
 ## Code Conventions & Common Patterns
 
@@ -64,15 +80,16 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
 - `internal/config/config.go` - every environment variable and its default.
 - `internal/keys/keys.go` - `Parse` and `wkdView`; `packets.go` splits raw packets.
-- `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries.
+- `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions.
+- `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `session.go`, `csrf.go`, `ratelimit.go`.
 - `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
 - `.env.example` - documented settings; copy to `.env` (gitignored).
-- `Dockerfile` - Go build stage, Debian slim runtime, static binary, non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
+- `Dockerfile` - Go build stage, Debian slim runtime, static binary, CA bundle copied from the build stage (for SMTP TLS), non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
 
 ## Runtime/Tooling Preferences
 
 - Go 1.27 (`go.mod`); module path `git.gnuweeb.net/GNUWeeb/matcha`. `CGO_ENABLED=0` builds must keep working, so no cgo dependencies.
-- Dependencies: `github.com/ProtonMail/go-crypto` (OpenPGP; not the deprecated `golang.org/x/crypto/openpgp`), `modernc.org/sqlite` (pure Go, driver name `sqlite`), `golang.org/x/sync`. Prefer the standard library; templ, chi and htmx come in with the dashboard.
+- Dependencies: `github.com/ProtonMail/go-crypto` (OpenPGP; not the deprecated `golang.org/x/crypto/openpgp`), `modernc.org/sqlite` (pure Go, driver name `sqlite`), `github.com/go-chi/chi/v5`, `github.com/a-h/templ` (library, and the generator as a `tool` in `go.mod`), `golang.org/x/sync`. Prefer the standard library.
 - Default branch `master`; release tags are bare semver (`1.0.1`).
 - Hosting: `origin` is `git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server` (GitLab; renaming the project to `matcha` waits on the owner). There is no CI: no `.gitlab-ci.yml`, and the GitHub workflows were deleted.
 

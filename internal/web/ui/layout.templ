@@ -1,0 +1,74 @@
+package ui
+
+// Page is what every page's frame needs.
+type Page struct {
+	// Title is the page's own title; the site name is appended.
+	Title string
+	// CSRF is the token every form carries in csrf_token.
+	CSRF string
+	// Address is the logged-in member's address; empty before login.
+	Address string
+}
+
+// Layout is the frame of every page. Before login the content sits in
+// one narrow column under the site name; after login a header names the
+// member and offers the logout button.
+templ Layout(p Page) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light dark"/>
+			<title>{ p.Title } - GNUWeeb OpenPGP keys</title>
+		</head>
+		<body>
+			<a class="skip" href="#main">Skip to content</a>
+			if p.Address == "" {
+				<div class="bare">
+					@brand()
+					<main id="main" class="bare-main" tabindex="-1">
+						{ children... }
+					</main>
+				</div>
+			} else {
+				<div class="shell">
+					<header class="topbar">
+						@brand()
+						<span class="who">{ p.Address }</span>
+						<form method="post" action="/logout">
+							@CSRFField(p.CSRF)
+							<button type="submit" class="btn btn-quiet">Log out</button>
+						</form>
+					</header>
+					<main id="main" class="page" tabindex="-1">
+						{ children... }
+					</main>
+				</div>
+			}
+		</body>
+	</html>
+}
+
+templ brand() {
+	<a class="brand" href="/">GNUWeeb <span>OpenPGP keys</span></a>
+}
+
+// CSRFField is the hidden field that carries the CSRF token in a form.
+templ CSRFField(token string) {
+	<input type="hidden" name="csrf_token" value={ token }/>
+}
+
+// Message is a page that only says something: an error, or a notice
+// with a way on.
+templ Message(p Page, heading, text, linkHref, linkLabel string) {
+	@Layout(p) {
+		<section class="card">
+			<h1>{ heading }</h1>
+			<p>{ text }</p>
+			if linkHref != "" {
+				<p><a class="btn btn-primary" href={ templ.SafeURL(linkHref) }>{ linkLabel }</a></p>
+			}
+		</section>
+	}
+}

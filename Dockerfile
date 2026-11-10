@@ -28,6 +28,8 @@ RUN groupadd --system --gid ${MATCHA_UID} matcha \
  && install -d -o matcha -g matcha -m 0700 /var/lib/matcha
 
 COPY --from=build /out/matcha /usr/local/bin/matcha
+# The CA bundle, for TLS to the SMTP server; Debian slim ships none.
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Inside the container both listeners bind every interface; publish the
 # WKD port only where the nginx in front of the mail domain reaches it.
