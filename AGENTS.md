@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-`matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and will give members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
+`matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and gives members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: rewrite in progress.** The Node service was removed; the Go rewrite is built phase by phase following `ROADMAP.md`, which holds the plan and the settled decisions. Read it before any feature work and treat it as the authority on direction.
+**Status: phases 1 to 5 of `ROADMAP.md` are implemented in this repository; the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
 
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
@@ -54,6 +54,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 - `internal/store/` - SQLite database and migrations.
 - `internal/web/` - dashboard handlers and middleware; `internal/web/ui/` - templ components; `internal/web/static/` - embedded CSS, htmx, fonts.
 - `internal/wkd/` - WKD hash and HTTP routes.
+- `deploy/nginx/` - example nginx server blocks for `gnuweeb.org` (WKD prefix) and `pgp.gnuweeb.org` (dashboard).
 
 There is no `scripts/` or `docs/` directory.
 
@@ -65,6 +66,7 @@ go vet ./... && go test ./...     # the gate
 go tool templ generate            # after editing internal/web/ui/*.templ
 go run ./cmd/matcha               # run with settings from the environment
 docker build -t matcha .          # image; podman build works the same
+docker compose up -d --build      # the deployment in compose.yaml (needs .env)
 ```
 
 Configuration is read from the environment only; the binary does not read `.env`. `SMTP_HOST` is required; everything else has a default (`internal/config/config.go`). For a local run: `set -a; . ./.env; set +a; go run ./cmd/matcha`. Docker: `docker run --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 matcha`. The session and CSRF cookies are `Secure`; browsers accept them on `http://localhost`, other clients may need HTTPS (the tests use `httptest.NewTLSServer`).
@@ -90,6 +92,8 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
 - `.env.example` - documented settings; copy to `.env` (gitignored).
 - `Dockerfile` - Go build stage, Debian slim runtime, static binary, CA bundle copied from the build stage (for SMTP TLS), non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
+- `compose.yaml` - the deployment: ports on loopback for the host's nginx, `.env` as settings, `REAL_IP_HEADER=X-Real-IP`, volume `matcha-data`, read-only root file system, no capabilities.
+- `deploy/nginx/*.conf` - examples, kept in step with the listeners and with matcha's 2 MiB form cap (`client_max_body_size`). DNS, TLS and the live nginx configuration are maintained by hand on the servers, not here.
 
 ## Runtime/Tooling Preferences
 
