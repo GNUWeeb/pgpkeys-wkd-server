@@ -190,6 +190,8 @@ Status: the repository's part is done 2026-11-11; the production part is not. In
 - Mail a reminder 30, 10 and 3 days before a key expires.
 - Expired keys stay available so old signatures remain checkable.
 
+Status: done 2026-11-11, in Go (see the decision on the key-health checker). `keys.Check` applies the rule on upload and in the dashboard; a check at start and then daily mails the reminders and logs keys that cannot sign. Decided here: a refused upload explains the problem with the GnuPG commands that fix it; a revoked key is accepted, so that the revocation gets published; the dashboard warns from 30 days before a key stops signing. Checked against `sq` 1.3.1 (Debian 13) with keys made by GnuPG 2.4.9: both agree on a sound key, a key whose signing subkey expires first, an expired key, a key self-signed with SHA-1 (refused) and an RSA-1024 key (refused); they differ on DSA (see "Open Items"). With a local instance and Mailpit, the list showed the problem and its commands in light and dark and at 390 px, a SHA-1 key was refused with its fix, and a restart mailed one reminder 10 days before a signing subkey ended and none on the next restart.
+
 ### 7. Keyring export
 
 - Write `keys/<FINGERPRINT>.asc` (and `keys/expired/`) from the store into a local directory laid out like kernel.org's `pgpkeys.git`, so `gpg --import keys/*.asc` works on it. Armored, all User IDs and certifications as stored; the same store gives the same bytes, so an unchanged store produces no diff.
@@ -223,6 +225,8 @@ greentea is Go with templ templates. Its stylesheet is a reference, not a source
 
 - Checked in phase 2: `go-crypto`'s `Identity.Signatures` holds every signature on a User ID, self-signatures included, not only third-party ones; `ReadKeyRing` rejects a key whose User ID self-signature does not verify and lists only self-signed User IDs. GnuPG accepts the WKD view (`--check-sigs`: all good), and a certification by another key verifies with `VerifyUserIdSignature`.
 - Chosen in phase 2: `modernc.org/sqlite`, a pure-Go driver, so `CGO_ENABLED=0` builds keep working.
+- Checked in phase 6: `sq` 1.3.1 accepts a DSA-2048 key made by GnuPG 2.4.9, so "DSA keys are rejected" in the kernel.org reference model does not hold for `sq` itself. The rule here refuses DSA, as phase 6 lists it.
+- Checked in phase 6: GnuPG 2.4.9 keeps the hash of the self-signature it replaces, so `gpg --quick-set-expire` alone left a SHA-1 key on SHA-1; with `--cert-digest-algo SHA512` the new self-signatures used SHA-512 and the key passed. kernel.org's documentation says a recent GnuPG repairs such keys; 2.4.9 does not.
 - Renaming the GitLab project needs the owner's agreement.
 
 ## References
