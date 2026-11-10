@@ -212,6 +212,8 @@ Status: deferred by the maintainer, 2026-11-11.
 - Optional: a graph of certifications between members.
 - No gate: publication never depends on certifications.
 
+Status: done 2026-11-11, without the optional graph. Under each User ID the key list names the members whose stored keys certified it, by the addresses those keys are stored for, and counts certifications by keys outside the directory. Decided here: a certification counts when it verifies against a stored key, uses a hash the phase 6 policy accepts, has not expired and was not revoked later by the same signer; certifications sit with the User ID they are about rather than in a column, which made the table wider than a desktop page. Not done: the graph. It would show every member's address to every member, which is the owner's call; the per-key list shows only those who certified the member's own key. Checked: GnuPG 2.4.9 certified a stored key with two members' keys and one outside key; after the upload the list named both members and counted the third, in light and dark and at 390 px without widening the page.
+
 ## Design Reference: greentea (observed)
 
 greentea is Go with templ templates. Its stylesheet is a reference, not a source to copy.
