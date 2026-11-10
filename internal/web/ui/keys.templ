@@ -1,0 +1,165 @@
+package ui
+
+import (
+	"strings"
+	"time"
+
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
+)
+
+// Flash is a one-line notice above a page's content.
+type Flash struct {
+	// Kind is "ok" or "danger".
+	Kind string
+	Text string
+}
+
+// groupFingerprint writes a fingerprint in groups of four, as gpg does.
+func groupFingerprint(fpr string) string {
+	var b strings.Builder
+	for i := 0; i < len(fpr); i += 4 {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(fpr[i:min(i+4, len(fpr))])
+	}
+	return b.String()
+}
+
+func date(t time.Time) string { return t.UTC().Format("2006-01-02") }
+
+templ flash(f Flash) {
+	if f.Text != "" {
+		<div class={ "flash", f.Kind } role="status">{ f.Text }</div>
+	}
+}
+
+templ keyStatus(k keys.Info) {
+	switch {
+		case k.Revoked:
+			<span class="badge danger">Revoked</span>
+		case k.Expired:
+			<span class="badge warn">Expired</span>
+		default:
+			<span class="badge ok">Valid</span>
+	}
+}
+
+// Keys lists the member's keys, newest first, as WKD serves them.
+templ Keys(p Page, list []keys.Info, f Flash, wkdURL string) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Your keys</h1>
+				<p class="muted">Keys published for <b>{ p.Address }</b> through Web Key Directory.</p>
+			</div>
+			<a class="btn btn-primary" href="/keys/new">Add key</a>
+		</header>
+		@flash(f)
+		if len(list) == 0 {
+			<div class="empty">
+				<p class="empty-title">No keys yet</p>
+				<p>Add your public key, and <code>gpg --locate-keys { p.Address }</code> will find it.</p>
+				<a class="btn btn-primary" href="/keys/new">Add key</a>
+			</div>
+		} else {
+			<div class="tbl-wrap">
+				<table class="tbl">
+					<thead>
+						<tr>
+							<th scope="col">Key</th>
+							<th scope="col">User IDs</th>
+							<th scope="col">Created</th>
+							<th scope="col">Expires</th>
+							<th scope="col">Status</th>
+							<th scope="col"><span class="sr-only">Actions</span></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, k := range list {
+							<tr>
+								<td><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></td>
+								<td>
+									<ul class="uids">
+										for _, id := range k.UserIDs {
+											<li>{ id }</li>
+										}
+									</ul>
+								</td>
+								<td><time datetime={ k.Created.UTC().Format(time.RFC3339) }>{ date(k.Created) }</time></td>
+								<td>
+									if k.Expires.IsZero() {
+										<span class="muted">Never</span>
+									} else {
+										<time datetime={ k.Expires.UTC().Format(time.RFC3339) }>{ date(k.Expires) }</time>
+									}
+								</td>
+								<td>
+									@keyStatus(k)
+								</td>
+								<td class="actions-cell">
+									<a class="btn btn-danger" href={ templ.SafeURL("/keys/" + k.Fingerprint + "/remove") }>Remove</a>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there.</p>
+		}
+	}
+}
+
+// AddKey is the upload form; pasted and errText refill it after an
+// error.
+templ AddKey(p Page, pasted, errText string, maxKiB int) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Add key</h1>
+				<p class="muted">The key needs a User ID with <b>{ p.Address }</b>. Uploading a key again replaces it, for example after you extended its expiry.</p>
+			</div>
+		</header>
+		if errText != "" {
+			<div class="flash danger" role="alert">{ errText }</div>
+		}
+		<form method="post" action="/keys" enctype="multipart/form-data" class="card stack">
+			@CSRFField(p.CSRF)
+			<label class="field">
+				<span>Paste the public key</span>
+				<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
+				<small class="muted">Output of <code>gpg --armor --export { p.Address }</code>.</small>
+			</label>
+			<label class="field">
+				<span>Or choose a file</span>
+				<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
+				<small class="muted">Armored or binary, up to { maxKiB } KiB.</small>
+			</label>
+			<div class="actions">
+				<button type="submit" class="btn btn-primary">Add key</button>
+				<a class="btn" href="/">Cancel</a>
+			</div>
+		</form>
+	}
+}
+
+// RemoveKey asks before a key is removed.
+templ RemoveKey(p Page, k keys.Info) {
+	@Layout(p) {
+		<section class="card">
+			<h1>Remove key?</h1>
+			<p>WKD stops serving this key for <b>{ p.Address }</b> at once. Copies that others already fetched stay with them.</p>
+			<p><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></p>
+			<ul class="uids">
+				for _, id := range k.UserIDs {
+					<li>{ id }</li>
+				}
+			</ul>
+			<form method="post" action={ templ.SafeURL("/keys/" + k.Fingerprint + "/remove") } class="actions">
+				@CSRFField(p.CSRF)
+				<button type="submit" class="btn btn-danger-solid">Remove key</button>
+				<a class="btn" href="/">Cancel</a>
+			</form>
+		</section>
+	}
+}

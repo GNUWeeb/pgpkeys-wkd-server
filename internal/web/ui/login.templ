@@ -8,7 +8,7 @@ templ Login(p Page, domain, address, errText string) {
 			<h1>Log in</h1>
 			<p>Enter your { "@" + domain } address. We mail you a link that logs you in; there is no password.</p>
 			if errText != "" {
-				<div class="flash flash-error" role="alert">{ errText }</div>
+				<div class="flash danger" role="alert">{ errText }</div>
 			}
 			<form method="post" action="/login" class="stack">
 				@CSRFField(p.CSRF)

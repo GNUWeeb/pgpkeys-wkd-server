@@ -1,5 +1,7 @@
 package ui
 
+import "encoding/json"
+
 // Page is what every page's frame needs.
 type Page struct {
 	// Title is the page's own title; the site name is appended.
@@ -8,11 +10,32 @@ type Page struct {
 	CSRF string
 	// Address is the logged-in member's address; empty before login.
 	Address string
+	// Asset returns the versioned URL of a static file.
+	Asset func(name string) string
+	// Nav is the path of the navigation entry to mark as current.
+	Nav string
+}
+
+// htmxConfig keeps htmx within the Content-Security-Policy (no inline
+// styles, no eval) and has it swap error responses too, since the pages
+// answer a failed form with the form and its error (422 and the like).
+const htmxConfig = `{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false,` +
+	`"responseHandling":[{"code":"204","swap":false},{"code":"...","swap":true}]}`
+
+func csrfHeaders(token string) string {
+	b, _ := json.Marshal(map[string]string{"X-CSRF-Token": token})
+	return string(b)
 }
 
 // Layout is the frame of every page. Before login the content sits in
-// one narrow column under the site name; after login a header names the
-// member and offers the logout button.
+// one narrow column under the site name; after login a sidebar holds the
+// navigation, the member's address and the logout button, and becomes a
+// bar above the content on a narrow screen.
+//
+// htmx boosts every link and form (hx-boost on the body): it fetches the
+// next page and swaps its body in. Without JavaScript the same links and
+// forms work as plain HTML. htmx sends the CSRF token from main; the
+// forms carry it as well.
 templ Layout(p Page) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -20,28 +43,45 @@ templ Layout(p Page) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="color-scheme" content="light dark"/>
+			<meta name="htmx-config" content={ htmxConfig }/>
 			<title>{ p.Title } - GNUWeeb OpenPGP keys</title>
+			<link rel="preload" href={ p.Asset("inter.woff2") } as="font" type="font/woff2" crossorigin/>
+			<link rel="icon" href={ p.Asset("favicon.svg") } type="image/svg+xml"/>
+			<link rel="stylesheet" href={ p.Asset("matcha.css") }/>
+			<script src={ p.Asset("htmx.min.js") } defer></script>
 		</head>
-		<body>
+		<body hx-boost="true">
 			<a class="skip" href="#main">Skip to content</a>
 			if p.Address == "" {
 				<div class="bare">
 					@brand()
-					<main id="main" class="bare-main" tabindex="-1">
+					<main id="main" class="bare-main" tabindex="-1" hx-headers={ csrfHeaders(p.CSRF) }>
 						{ children... }
 					</main>
 				</div>
 			} else {
 				<div class="shell">
-					<header class="topbar">
+					<nav class="side" aria-label="Main">
 						@brand()
-						<span class="who">{ p.Address }</span>
-						<form method="post" action="/logout">
-							@CSRFField(p.CSRF)
-							<button type="submit" class="btn btn-quiet">Log out</button>
-						</form>
-					</header>
-					<main id="main" class="page" tabindex="-1">
+						<ul class="nav">
+							<li>
+								<a
+									href="/"
+									if p.Nav == "/" {
+										aria-current="page"
+									}
+								>Keys</a>
+							</li>
+						</ul>
+						<div class="side-foot">
+							<span class="who" title={ p.Address }>{ p.Address }</span>
+							<form method="post" action="/logout">
+								@CSRFField(p.CSRF)
+								<button type="submit" class="btn btn-quiet">Log out</button>
+							</form>
+						</div>
+					</nav>
+					<main id="main" class="page" tabindex="-1" hx-headers={ csrfHeaders(p.CSRF) }>
 						{ children... }
 					</main>
 				</div>
@@ -51,7 +91,7 @@ templ Layout(p Page) {
 }
 
 templ brand() {
-	<a class="brand" href="/">GNUWeeb <span>OpenPGP keys</span></a>
+	<a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">GNUWeeb <span>OpenPGP keys</span></span></a>
 }
 
 // CSRFField is the hidden field that carries the CSRF token in a form.

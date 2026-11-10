@@ -56,6 +56,7 @@ type Server struct {
 	log     *slog.Logger
 	now     func() time.Time
 	clients *limiter
+	assets  *assets
 	mails   sync.WaitGroup
 	router  chi.Router
 }
@@ -69,21 +70,31 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		log:     log,
 		now:     time.Now,
 		clients: newLimiter(clientLimit, rateWindow),
+		assets:  newAssets(),
 	}
 	r := chi.NewRouter()
-	r.Use(securityHeaders, s.csrf, s.session)
+	r.Use(securityHeaders)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		s.message(w, r, http.StatusNotFound, "Not found", "There is no page here.", "/", "Go to the start page")
 	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		s.message(w, r, http.StatusMethodNotAllowed, "Not allowed", "This page does not accept that request.", "/", "Go to the start page")
 	})
-	r.Get("/", s.requireLogin(s.home))
-	r.Get("/login", s.loginForm)
-	r.Post("/login", s.loginRequest)
-	r.Get("/login/confirm", s.confirmForm)
-	r.Post("/login/confirm", s.confirm)
-	r.Post("/logout", s.logout)
+	// Static files carry no cookies, so caches may keep them.
+	r.Handle("/static/*", s.assets)
+	r.Group(func(r chi.Router) {
+		r.Use(s.csrf, s.session)
+		r.Get("/", s.requireLogin(s.keyList))
+		r.Get("/login", s.loginForm)
+		r.Post("/login", s.loginRequest)
+		r.Get("/login/confirm", s.confirmForm)
+		r.Post("/login/confirm", s.confirm)
+		r.Post("/logout", s.logout)
+		r.Get("/keys/new", s.requireLogin(s.addKeyForm))
+		r.Post("/keys", s.requireLogin(s.addKey))
+		r.Get("/keys/{fpr}/remove", s.requireLogin(s.removeKeyForm))
+		r.Post("/keys/{fpr}/remove", s.requireLogin(s.removeKey))
+	})
 	s.router = r
 	return s
 }
@@ -96,7 +107,7 @@ func (s *Server) Wait() { s.mails.Wait() }
 
 // page returns the frame data for r.
 func (s *Server) page(r *http.Request, title string) ui.Page {
-	return ui.Page{Title: title, CSRF: csrfToken(r), Address: sessionAddress(r)}
+	return ui.Page{Title: title, CSRF: csrfToken(r), Address: sessionAddress(r), Asset: s.assets.url}
 }
 
 // render writes c with the given status.
