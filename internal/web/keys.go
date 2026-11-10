@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web/ui"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
@@ -45,15 +46,25 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	signers, addresses, err := s.signers(r)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	now := s.now()
-	list := make([]keys.Info, 0, len(stored))
+	list := make([]ui.KeyRow, 0, len(stored))
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
 		if err != nil {
 			s.internalError(w, r, err)
 			return
 		}
-		list = append(list, info)
+		certs, others, err := keys.Certifications(k.Data, signers, now)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		list = append(list, ui.KeyRow{Info: info, Certifiers: certifiers(certs, addresses), Others: others})
 	}
 
 	var f ui.Flash
@@ -66,6 +77,39 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 	p := s.page(r, "Your keys")
 	p.Nav = "/"
 	s.render(w, r, http.StatusOK, ui.Keys(p, list, f, s.wkdURL(addr)))
+}
+
+// signers returns every stored key as a possible certifier, once per
+// fingerprint from its latest upload, with the addresses each key is
+// stored for.
+func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, error) {
+	all, err := s.store.AllKeys(r.Context())
+	if err != nil {
+		return nil, nil, err
+	}
+	latest := map[string]store.StoredKey{}
+	addresses := map[string][]string{}
+	for _, k := range all {
+		if prev, ok := latest[k.Fingerprint]; !ok || k.Uploaded.After(prev.Uploaded) {
+			latest[k.Fingerprint] = k
+		}
+		addresses[k.Fingerprint] = append(addresses[k.Fingerprint], k.Address)
+	}
+	signers := make([]keys.Signer, 0, len(latest))
+	for fpr, k := range latest {
+		signers = append(signers, keys.Signer{Fingerprint: fpr, Data: k.Data})
+	}
+	return signers, addresses, nil
+}
+
+// certifiers groups certs by the User ID they certify and names each
+// certifying key by its addresses.
+func certifiers(certs []keys.Certification, addresses map[string][]string) map[string][]ui.Certifier {
+	out := map[string][]ui.Certifier{}
+	for _, c := range certs {
+		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: addresses[c.Signer], Created: c.Created})
+	}
+	return out
 }
 
 func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {
