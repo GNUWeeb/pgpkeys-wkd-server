@@ -31,7 +31,7 @@ Settled by the maintainer on 2026-11-11:
 | Topic | Decision |
 | --- | --- |
 | Other User IDs in the WKD response | Kept, as kernel.org does. This deviates from section 5 of the WKD draft (see "WKD Behaviour"). |
-| `GNUWeeb/pgpkeys` repository | No longer where keys are submitted. The service's database is the source of truth; the repository becomes a generated, signed export (phase 7). |
+| `GNUWeeb/pgpkeys` repository | No longer where keys are submitted. The service's database is the source of truth; the repository becomes a generated export (phase 7), committed with signed commits (phase 8). |
 | Keys already in `GNUWeeb/pgpkeys` | Not imported. The directory starts empty and members upload through the dashboard. |
 | Keys per address | Several allowed; all are served, newest first. |
 | Who may log in | Any `@gnuweeb.org` address that receives the link, aliases included. |
@@ -121,9 +121,9 @@ The store keeps each key as submitted, including third-party certifications (nee
 
 ## Phases
 
-Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 8 are the kernel.org-style additions.
+Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 9 are the kernel.org-style additions.
 
-Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 8 are not to be started until asked for.
+Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 9 are not to be started until asked for.
 
 ### 1. Tooling and rename
 
@@ -192,10 +192,15 @@ Status: the repository's part is done 2026-11-11; the production part is not. In
 
 ### 7. Keyring export
 
-- Publish `keys/<FINGERPRINT>.asc` (and `keys/expired/`) from the store to `GNUWeeb/pgpkeys` with signed commits, so `gpg --import keys/*.asc` keeps working as it does for kernel.org's `pgpkeys.git`.
-- The export replaces the repository's hand-maintained content (`map.txt`, `genmap.py`, the pull-request flow). Which key signs the commits is decided here.
+- Write `keys/<FINGERPRINT>.asc` (and `keys/expired/`) from the store into a local directory laid out like kernel.org's `pgpkeys.git`, so `gpg --import keys/*.asc` works on it. Armored, all User IDs and certifications as stored; the same store gives the same bytes, so an unchanged store produces no diff.
+- No git operations and no signing key: the export runs and is tested on its own.
 
-### 8. Web of trust display
+### 8. Keyring publishing
+
+- Commit the export to `GNUWeeb/pgpkeys` with signed commits and push it, so the repository follows the store.
+- The published export replaces the repository's hand-maintained content (`map.txt`, `genmap.py`, the pull-request flow). Which key signs the commits, and how it is held on the server, is decided here.
+
+### 9. Web of trust display
 
 - Show, per key, which other members' keys certified it.
 - Optional: a graph of certifications between members.
