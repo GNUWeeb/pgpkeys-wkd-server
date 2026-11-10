@@ -561,7 +561,7 @@ func Keys(p Page, list []keys.Info, f Flash, wkdURL string) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies; a reminder comes by mail 30, 10 and 3 days before that ends.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

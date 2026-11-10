@@ -155,7 +155,7 @@ templ Keys(p Page, list []keys.Info, f Flash, wkdURL string) {
 			if anyProblems(list) {
 				@fixes(list)
 			}
-			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies.</p>
+			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies; a reminder comes by mail 30, 10 and 3 days before that ends.</p>
 		}
 	}
 }
