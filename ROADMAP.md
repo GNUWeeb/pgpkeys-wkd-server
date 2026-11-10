@@ -182,6 +182,8 @@ Status: done 2026-11-11. In headless Chromium against a local instance (mail thr
 
 Done when: a member uploads a key and `gpg --locate-key <member>@gnuweeb.org` returns it from an outside machine.
 
+Status: the repository's part is done 2026-11-11; the production part is not. In the repository: `compose.yaml`, example nginx server blocks in `deploy/nginx/`, and a deployment section in `README.md`. Checked with `podman compose` and the repository's `compose.yaml` plus a test overlay (Mailpit, an nginx running the two example blocks with `gnuweeb.org` renamed to `gnuweeb.test` and a test CA): a member logged in by mailed link over STARTTLS, uploaded a key file, GnuPG 2.4.7 in a fresh `GNUPGHOME` located it through `https://gnuweeb.test/.well-known/openpgpkey/`, removing it made WKD answer 404, `POST` below the prefix got 403 and `/` the redirect to `www`. The container ran with a read-only root file system and no capabilities. Still to do on the servers, by the owner: the DNS record and certificate for `pgp.gnuweeb.org`, the nginx changes, the production `.env` with the SMTP credentials for `pgp@gnuweeb.org`, starting the service, the announcement, and the check from an outside machine named in "Done when".
+
 ### 6. Key health and expiry reminders
 
 - Apply kernel.org's usability rule on upload and in a daily check: at least one usable signing (sub)key; flag expired keys, weak-hash (SHA-1, MD5, RIPEMD-160) self-signatures, DSA and keys with no signing key. The dashboard explains what to fix.
