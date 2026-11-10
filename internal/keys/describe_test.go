@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"bytes"
 	"slices"
 	"testing"
 	"time"
@@ -25,7 +26,13 @@ func TestDescribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"Alice <alice@gnuweeb.org>", "Alice <alice@example.org>"}; !slices.Equal(info.UserIDs, want) {
+	// Entity.Serialize writes User IDs in map order, so the expected
+	// order is where each one sits in the serialized key.
+	want := []string{"Alice <alice@gnuweeb.org>", "Alice <alice@example.org>"}
+	slices.SortFunc(want, func(a, b string) int {
+		return bytes.Index(data, []byte(a)) - bytes.Index(data, []byte(b))
+	})
+	if !slices.Equal(info.UserIDs, want) {
 		t.Errorf("UserIDs = %q, want %q", info.UserIDs, want)
 	}
 	if !info.Created.Equal(created) || !info.Expires.Equal(created.Add(24*time.Hour)) || info.Expired || info.Revoked {
