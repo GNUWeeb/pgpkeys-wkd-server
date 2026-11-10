@@ -41,7 +41,7 @@ func Load(getenv func(string) string) (Config, error) {
 	c := Config{
 		WKDAddr:       envOr(getenv, "WKD_ADDR", "127.0.0.1:8080"),
 		DashboardAddr: envOr(getenv, "DASHBOARD_ADDR", "127.0.0.1:8081"),
-		DatabasePath:  envOr(getenv, "DATABASE_PATH", "matcha.db"),
+		DatabasePath:  DatabasePath(getenv),
 		EmailDomain:   strings.ToLower(envOr(getenv, "EMAIL_DOMAIN", "gnuweeb.org")),
 		BaseURL:       strings.TrimSuffix(envOr(getenv, "BASE_URL", "https://pgp.gnuweeb.org"), "/"),
 		RealIPHeader:  getenv("REAL_IP_HEADER"),
@@ -99,4 +99,10 @@ func envOr(getenv func(string) string, name, def string) string {
 		return v
 	}
 	return def
+}
+
+// DatabasePath returns DATABASE_PATH or its default. Commands that only
+// need the database, such as the keyring export, read it alone.
+func DatabasePath(getenv func(string) string) string {
+	return envOr(getenv, "DATABASE_PATH", "matcha.db")
 }
