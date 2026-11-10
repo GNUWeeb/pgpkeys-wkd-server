@@ -71,6 +71,8 @@ The WKD listener serves the direct method: `GET` and `HEAD` on `/.well-known/ope
 
 Members log in at `BASE_URL` with their address: matcha mails them a link that works once, for 15 minutes, and the link's page asks for a button press before it logs them in, so mail scanners that open links do not use it up. A session lasts 7 days or until logout. At most 5 links per hour are mailed to one address, and one client may ask for 20 per hour. The dashboard sets its cookies with the `__Host-` prefix, which needs HTTPS (browsers make an exception for `http://localhost`).
 
+After login, the start page lists the member's keys (fingerprint, User IDs, creation and expiry dates, status). **Add key** takes a pasted key or a file, armored or binary, up to 1 MiB; it must be a public key with a User ID for the member's address, and uploading a key again replaces it (for example after extending its expiry). **Remove** asks for confirmation; WKD stops serving the key at once. A member sees and changes only the keys of the address they logged in with. The pages work without JavaScript; with it, htmx swaps them in place.
+
 ## License
 
 GPL-2.0, see [LICENSE](LICENSE).
