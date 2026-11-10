@@ -11,21 +11,30 @@
 
 ## Architecture & Data Flow
 
-One process, two HTTP listeners, no state yet:
+One process, two HTTP listeners, one SQLite database:
 
 ```
-cmd/matcha/main.go: config.Load(os.Getenv) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown
+cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown
 ```
 
-- **WKD listener** (`WKD_ADDR`): will serve `/.well-known/openpgpkey/...`; only the nginx in front of `gnuweeb.org` is meant to reach it. Today it answers 404 to everything.
+- **WKD listener** (`WKD_ADDR`, `wkd.NewHandler`): `GET`/`HEAD /.well-known/openpgpkey/hu/<hash>` returns the WKD views of every key stored under that hash, concatenated newest first (key creation time), as `application/octet-stream`; 404 when there is none or the hash is malformed. `?l=` is ignored. `GET /.well-known/openpgpkey/policy` is one comment line. Only the nginx in front of `gnuweeb.org` is meant to reach this listener.
 - **Dashboard listener** (`DASHBOARD_ADDR`): will serve `pgp.gnuweeb.org`. Today it answers 404 to everything.
 
 `serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
+
+**Keys** (`internal/keys`): `keys.Parse(input, address)` accepts armored or binary input up to 1 MiB holding exactly one public key with a self-signed, unrevoked User ID whose address matches (case-insensitively); secret keys are refused. It returns the key as uploaded (binary) and its **WKD view**, built from the raw packets: signatures after a User ID or User Attribute are kept only when the primary key issued them, identities left without a signature are dropped, signatures on the primary key and subkeys are kept (so designated-revoker revocations reach clients), and trust, marker and other packets are dropped. All User IDs stay, as on kernel.org.
+
+**Store** (`internal/store`): table `keys`, unique on `(address, fingerprint)`; re-uploading a key replaces it. `wkd_hash` is derived from the address inside `PutKey`, never passed in. Addresses are stored as given, so callers normalize them first. Schema changes are appended to `migrations` in `store.go` (tracked by `PRAGMA user_version`); never edit a released migration.
+
+**WKD hash** (`wkd.Hash`): the local-part with only ASCII upper case lower-cased, SHA-1, z-base-32; tested against the draft's vector and two kernel.org entries.
 
 ## Key Directories
 
 - `cmd/matcha/` - the binary: wiring, signal handling, server lifecycle.
 - `internal/config/` - settings from the environment.
+- `internal/keys/` - upload checks and the WKD view.
+- `internal/store/` - SQLite database and migrations.
+- `internal/wkd/` - WKD hash and HTTP routes.
 
 There is no `scripts/` or `docs/` directory.
 
@@ -54,13 +63,16 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `ROADMAP.md` - plan for the rewrite: goal, decisions, kernel.org reference model, WKD behaviour, phases, open items.
 - `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
 - `internal/config/config.go` - every environment variable and its default.
+- `internal/keys/keys.go` - `Parse` and `wkdView`; `packets.go` splits raw packets.
+- `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries.
+- `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
 - `.env.example` - documented settings; copy to `.env` (gitignored).
-- `Dockerfile` - Go build stage, Debian slim runtime, static binary, non-root user; base images pinned by digest.
+- `Dockerfile` - Go build stage, Debian slim runtime, static binary, non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
 
 ## Runtime/Tooling Preferences
 
 - Go 1.27 (`go.mod`); module path `git.gnuweeb.net/GNUWeeb/matcha`. `CGO_ENABLED=0` builds must keep working, so no cgo dependencies.
-- Prefer the standard library; the dependencies decided in `ROADMAP.md` (`ProtonMail/go-crypto`, templ, chi, htmx, a pure-Go SQLite driver) come in with the phase that needs them.
+- Dependencies: `github.com/ProtonMail/go-crypto` (OpenPGP; not the deprecated `golang.org/x/crypto/openpgp`), `modernc.org/sqlite` (pure Go, driver name `sqlite`), `golang.org/x/sync`. Prefer the standard library; templ, chi and htmx come in with the dashboard.
 - Default branch `master`; release tags are bare semver (`1.0.1`).
 - Hosting: `origin` is `git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server` (GitLab; renaming the project to `matcha` waits on the owner). There is no CI: no `.gitlab-ci.yml`, and the GitHub workflows were deleted.
 

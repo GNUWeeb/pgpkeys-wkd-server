@@ -20,15 +20,19 @@ FROM docker.io/library/debian:13.7-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f
 # A fixed uid, so a volume mounted for matcha has a known owner.
 ARG MATCHA_UID=10001
 
+# /var/lib/matcha holds the SQLite database; a volume mounted there
+# starts with this owner and mode.
 RUN groupadd --system --gid ${MATCHA_UID} matcha \
  && useradd --system --uid ${MATCHA_UID} --gid matcha --no-create-home \
-      --home-dir /nonexistent --shell /usr/sbin/nologin matcha
+      --home-dir /nonexistent --shell /usr/sbin/nologin matcha \
+ && install -d -o matcha -g matcha -m 0700 /var/lib/matcha
 
 COPY --from=build /out/matcha /usr/local/bin/matcha
 
 # Inside the container both listeners bind every interface; publish the
 # WKD port only where the nginx in front of the mail domain reaches it.
-ENV WKD_ADDR=:8080 DASHBOARD_ADDR=:8081
+ENV WKD_ADDR=:8080 DASHBOARD_ADDR=:8081 DATABASE_PATH=/var/lib/matcha/matcha.db
+VOLUME /var/lib/matcha
 EXPOSE 8080/tcp 8081/tcp
 
 USER matcha
