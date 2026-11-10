@@ -716,6 +716,14 @@ textarea:focus-visible {
 	margin-top: var(--space-1);
 }
 
+/* Who certified a User ID, under it. */
+.certs {
+	display: block;
+	margin: var(--space-1) 0 0;
+	color: var(--muted);
+	font-size: var(--text-sm);
+}
+
 .card .uids {
 	margin-bottom: var(--space-4);
 }

@@ -105,6 +105,8 @@ Keys are judged by the rule kernel.org applies: a key is usable while its primar
 
 matcha checks every key when it starts and then daily, and mails the member 30, 10 and 3 days before their key stops signing, with the commands that extend it. Each reminder goes out once per expiry date; uploading the key with a new date starts them over.
 
+Under each User ID, the key list names the members whose keys certified it, by the addresses those keys are stored for (the tooltip gives the certifying key and the date), and counts certifications by keys that are not in the directory. Only certifications that verify against a stored key, use an accepted hash, have not expired and were not revoked count. They are shown for information: a key is published whether or not anyone certified it, and WKD serves keys without them.
+
 ## License
 
 GPL-2.0, see [LICENSE](LICENSE).

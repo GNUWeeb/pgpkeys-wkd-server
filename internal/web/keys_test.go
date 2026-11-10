@@ -42,13 +42,53 @@ func armoredKeyWith(t *testing.T, email string, cfg *packet.Config) (string, str
 	if err != nil {
 		t.Fatal(err)
 	}
+	return armoredEntity(t, e), strings.ToUpper(fingerprintHex(e.PrimaryKey.Fingerprint))
+}
+
+func armoredEntity(t *testing.T, e *openpgp.Entity) string {
+	t.Helper()
 	var b bytes.Buffer
 	w, _ := armor.Encode(&b, openpgp.PublicKeyType, nil)
 	if err := e.Serialize(w); err != nil {
 		t.Fatal(err)
 	}
 	w.Close()
-	return b.String(), strings.ToUpper(fingerprintHex(e.PrimaryKey.Fingerprint))
+	return b.String()
+}
+
+func TestKeyListShowsCertifiers(t *testing.T) {
+	h := newHarness(t)
+	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA}
+	newKey := func(email string) *openpgp.Entity {
+		e, err := openpgp.NewEntity("Test", "", email, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+	alice, bob, carol := newKey("alice@gnuweeb.org"), newKey("bob@gnuweeb.org"), newKey("carol@example.org")
+	for _, signer := range []*openpgp.Entity{bob, carol} {
+		if err := alice.SignIdentity("Test <alice@gnuweeb.org>", signer, cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if resp, _ := h.post(h.loginAs("bob@gnuweeb.org"), "/keys", url.Values{"key": {armoredEntity(t, bob)}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("bob's upload: status %d", resp.StatusCode)
+	}
+	aliceClient := h.loginAs("alice@gnuweeb.org")
+	if resp, _ := h.post(aliceClient, "/keys", url.Values{"key": {armoredEntity(t, alice)}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("alice's upload: status %d", resp.StatusCode)
+	}
+	_, body := h.get(aliceClient, "/")
+	for _, want := range []string{"Certified by", "bob@gnuweeb.org", "Also certified by 1 key not in this directory"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("alice's list lacks %q", want)
+		}
+	}
+	// Bob's own key was certified by no one.
+	if _, body := h.get(h.loginAs("bob@gnuweeb.org"), "/"); strings.Contains(body, "ertified by") {
+		t.Error("bob's list shows certifications his key does not have")
+	}
 }
 
 func fingerprintHex(b []byte) string {
