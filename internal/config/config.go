@@ -13,6 +13,8 @@ type Config struct {
 	WKDAddr string
 	// DashboardAddr is the listen address of the dashboard.
 	DashboardAddr string
+	// DatabasePath is the SQLite database file; it is created if missing.
+	DatabasePath string
 }
 
 // Load builds a Config from getenv (os.Getenv in production), applying
@@ -21,6 +23,7 @@ func Load(getenv func(string) string) (Config, error) {
 	c := Config{
 		WKDAddr:       envOr(getenv, "WKD_ADDR", "127.0.0.1:8080"),
 		DashboardAddr: envOr(getenv, "DASHBOARD_ADDR", "127.0.0.1:8081"),
+		DatabasePath:  envOr(getenv, "DATABASE_PATH", "matcha.db"),
 	}
 	for name, addr := range map[string]string{"WKD_ADDR": c.WKDAddr, "DASHBOARD_ADDR": c.DashboardAddr} {
 		if _, _, err := net.SplitHostPort(addr); err != nil {

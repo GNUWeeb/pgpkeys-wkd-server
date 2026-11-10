@@ -88,18 +88,18 @@ Settled by the maintainer on 2026-11-11:
 
 The specification is the Internet-Draft `draft-koch-openpgp-webkey-service` (revision 22, 2026-07-22, individual draft, expires 2027-01-23). It is not an RFC and can still change. Target: key discovery (section 3.1) with the direct method, served the way kernel.org serves it.
 
-| Behaviour | Node service (removed in phase 1) | Planned |
+| Behaviour | Node service (removed in phase 1) | matcha (phase 2) |
 | --- | --- | --- |
-| `GET .../hu/<hash>` returns the binary keys for the address, concatenated, newest first | yes | keep |
-| `HEAD` on the same URL | yes | keep |
-| `application/octet-stream`, not ASCII-armored | yes | keep |
-| `.../policy` is served (zero length is enough) | yes | keep |
-| Hash is z-base-32 of SHA-1 of the local-part with ASCII upper case mapped to lower case | no (trusts `W:` lines in `map.txt`; `genmap.py` does not lower-case) | compute it |
-| The served key carries a User ID with the requested address | not checked on the key itself | enforce on upload |
-| Third-party certifications are not served | no (whole key is served) | strip from the WKD view |
+| `GET .../hu/<hash>` returns the binary keys for the address, concatenated, newest first | yes | yes, ordered by key creation time |
+| `HEAD` on the same URL | yes | yes |
+| `application/octet-stream`, not ASCII-armored | yes | yes |
+| `.../policy` is served (zero length is enough) | yes | yes, one comment line |
+| Hash is z-base-32 of SHA-1 of the local-part with ASCII upper case mapped to lower case | no (trusts `W:` lines in `map.txt`; `genmap.py` does not lower-case) | computed from the address |
+| The served key carries a User ID with the requested address | not checked on the key itself | enforced on upload |
+| Third-party certifications are not served | no (whole key is served) | stripped from the WKD view |
 | Other User IDs on the key | served | served |
-| No HTTP 401 below the well-known prefix | webhook route can answer 401 | webhook is removed |
-| `?l=<local-part>` query parameter | ignored | accept and ignore |
+| No HTTP 401 below the well-known prefix | webhook route can answer 401 | no such route |
+| `?l=<local-part>` query parameter | ignored | ignored |
 
 Known deviation: section 5 of the draft says other User IDs and their binding signatures MUST be removed before publication. kernel.org does not do this, and the same section requires clients to drop the other User IDs themselves.
 
@@ -147,6 +147,8 @@ Status: done 2026-11-11. The image was built with `podman build .` (the Docker d
 - First automated tests: the draft's hash vector, the WKD view (no third-party certifications), several keys for one address, `GET`/`HEAD`/404, policy.
 
 Done when: `gpg --auto-key-locate wkd --locate-keys` against a local instance returns the key, with a fresh `GNUPGHOME`.
+
+Status: done 2026-11-11. In containers on one network, nginx with a test CA served `https://gnuweeb.test/.well-known/openpgpkey/` from the image, `openpgpkey.gnuweeb.test` did not resolve, and GnuPG 2.4 in a fresh `GNUPGHOME` (`--auto-key-locate clear,wkd,nodefault --locate-keys alice@gnuweeb.test`) imported the key. The uploaded key carried a certification by a second key and two User IDs; the served bytes held both User IDs and only self-signatures. Decided here: an upload is stored dearmored but otherwise byte for byte; the WKD view is cut from those raw packets, not re-serialized by `go-crypto`, whose `Entity.Serialize` would emit User IDs in map order and drop User Attributes. Upload cap 1 MiB.
 
 ### 3. Login by mailed link
 
@@ -206,8 +208,8 @@ greentea is Go with templ templates. Its stylesheet is a reference, not a source
 
 ## Open Items
 
-- Unverified: `go-crypto` keeps third-party certifications in a separate list per identity and has `VerifyUserIdSignature` (read in its source, not run). Confirm with a small test at the start of phase 2 that a key serialized without that list is accepted by `gpg`, and that certifications from other stored keys verify.
-- Unverified: which SQLite driver to use. Prefer a pure-Go one so the build needs no C toolchain.
+- Checked in phase 2: `go-crypto`'s `Identity.Signatures` holds every signature on a User ID, self-signatures included, not only third-party ones; `ReadKeyRing` rejects a key whose User ID self-signature does not verify and lists only self-signed User IDs. GnuPG accepts the WKD view (`--check-sigs`: all good), and a certification by another key verifies with `VerifyUserIdSignature`.
+- Chosen in phase 2: `modernc.org/sqlite`, a pure-Go driver, so `CGO_ENABLED=0` builds keep working.
 - Renaming the GitLab project needs the owner's agreement.
 
 ## References

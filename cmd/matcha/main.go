@@ -15,6 +15,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/config"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
 
 func main() {
@@ -34,8 +36,14 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	st, err := store.Open(ctx, cfg.DatabasePath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
 	servers := []*http.Server{
-		newServer(cfg.WKDAddr, http.NewServeMux()),
+		newServer(cfg.WKDAddr, wkd.NewHandler(st, log)),
 		newServer(cfg.DashboardAddr, http.NewServeMux()),
 	}
 	return serve(ctx, log, servers)
