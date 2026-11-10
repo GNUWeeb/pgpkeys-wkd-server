@@ -123,7 +123,7 @@ The store keeps each key as submitted, including third-party certifications (nee
 
 Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 9 are the kernel.org-style additions.
 
-Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 9 are not to be started until asked for.
+Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 9 are not to be started until asked for. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8; the next work is chosen from phases 6, 7 and 9.
 
 ### 1. Tooling and rename
 
@@ -199,6 +199,8 @@ Status: the repository's part is done 2026-11-11; the production part is not. In
 
 - Commit the export to `GNUWeeb/pgpkeys` with signed commits and push it, so the repository follows the store.
 - The published export replaces the repository's hand-maintained content (`map.txt`, `genmap.py`, the pull-request flow). Which key signs the commits, and how it is held on the server, is decided here.
+
+Status: deferred by the maintainer, 2026-11-11.
 
 ### 9. Web of trust display
 
