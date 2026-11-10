@@ -77,12 +77,7 @@ func Check(data []byte, now time.Time) (Health, error) {
 		"gpg --quick-set-expire " + fpr + " 5y",
 		"gpg --quick-set-expire " + fpr + " 5y '*'",
 	}
-	// GnuPG 2.4 keeps the hash of a self-signature it replaces, so the
-	// commands that repair a weak hash name a current one.
-	resign := []string{
-		"gpg --cert-digest-algo SHA512 --quick-set-expire " + fpr + " 5y",
-		"gpg --cert-digest-algo SHA512 --quick-set-expire " + fpr + " 5y '*'",
-	}
+	resign := resignCommands(fpr)
 	addSigning := []string{"gpg --quick-add-key " + fpr + " ed25519 sign 5y"}
 
 	var h Health
@@ -98,7 +93,7 @@ func Check(data []byte, now time.Time) (Health, error) {
 	if weak := weakHashes(anyTime, loose); weak != "" {
 		h.Problems = append(h.Problems, Problem{
 			Text:     "Some of the key's self-signatures use " + weak + ", which is no longer accepted.",
-			Fix:      "Make new self-signatures with a current hash, then upload the key again. Extending the expiry date with a hash named makes them.",
+			Fix:      weakHashFix,
 			Commands: resign,
 		})
 	}
@@ -347,6 +342,17 @@ func earliest(a, b time.Time) time.Time {
 		return a
 	}
 	return b
+}
+
+const weakHashFix = "Make new self-signatures with a current hash, then upload the key again. The commands below do that: they extend the expiry date and sign with SHA-512."
+
+// resignCommands make new self-signatures on the key fpr. GnuPG 2.4 keeps
+// the hash of a self-signature it replaces, so they name a current one.
+func resignCommands(fpr string) []string {
+	return []string{
+		"gpg --cert-digest-algo SHA512 --quick-set-expire " + fpr + " 5y",
+		"gpg --cert-digest-algo SHA512 --quick-set-expire " + fpr + " 5y '*'",
+	}
 }
 
 func day(t time.Time) string { return t.UTC().Format("2006-01-02") }

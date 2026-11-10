@@ -100,7 +100,7 @@ func (s *Server) addKey(w http.ResponseWriter, r *http.Request) {
 		fail("Paste a key or choose a file.")
 		return
 	}
-	k, err := keys.Parse(input, addr)
+	k, err := keys.Parse(input, addr, s.now())
 	if err != nil {
 		fail("This key cannot be added: " + err.Error() + ".")
 		return

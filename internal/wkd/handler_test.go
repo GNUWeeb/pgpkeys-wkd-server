@@ -32,7 +32,7 @@ func newKey(t *testing.T, email, address string, created time.Time) *keys.Key {
 	if err := e.Serialize(&b); err != nil {
 		t.Fatal(err)
 	}
-	k, err := keys.Parse(b.Bytes(), address)
+	k, err := keys.Parse(b.Bytes(), address, created)
 	if err != nil {
 		t.Fatal(err)
 	}

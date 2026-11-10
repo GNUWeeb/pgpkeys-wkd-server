@@ -2,8 +2,11 @@ package keys
 
 import (
 	"bytes"
+	"crypto"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
@@ -79,7 +82,7 @@ func TestParseStripsThirdPartyCertifications(t *testing.T) {
 		t.Fatalf("test setup: upload has %d signatures by bob, want 1", n)
 	}
 
-	k, err := Parse(upload, "alice@gnuweeb.org")
+	k, err := Parse(upload, "alice@gnuweeb.org", time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +120,7 @@ func TestParseDropsUserIDWithOnlyThirdPartyCertifications(t *testing.T) {
 	uid.Serialize(&b)
 	sig.Serialize(&b)
 
-	k, err := Parse(b.Bytes(), "alice@gnuweeb.org")
+	k, err := Parse(b.Bytes(), "alice@gnuweeb.org", time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +137,7 @@ func TestParseAccepts(t *testing.T) {
 		"armored": armored(t, openpgp.PublicKeyType, bin),
 	} {
 		t.Run(name, func(t *testing.T) {
-			k, err := Parse(input, "alice@gnuweeb.org")
+			k, err := Parse(input, "alice@gnuweeb.org", time.Now())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -162,6 +165,18 @@ func TestParseRejects(t *testing.T) {
 	ident := revoked.Identities["Alice <alice@gnuweeb.org>"]
 	ident.Revocations = append(ident.Revocations, packet.NewVerifiableSig(
 		userIDSig(t, revoked, revoked, ident.Name, packet.SigTypeCertificationRevocation)))
+	// The User ID's only self-signature marked as made with MD5, which
+	// go-crypto cannot read.
+	md5 := public(t, alice)
+	pkts, err := splitPackets(md5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range pkts {
+		if p.tag == tagSignature && p.raw[p.hdr+1] == byte(packet.SigTypePositiveCert) {
+			p.raw[p.hdr+3] = 1
+		}
+	}
 
 	tests := map[string]struct {
 		input []byte
@@ -177,10 +192,11 @@ func TestParseRejects(t *testing.T) {
 		"empty":          {nil, "no public key"},
 		"truncated":      {public(t, alice)[:40], "malformed"},
 		"too large":      {make([]byte, MaxSize+1), "larger than"},
+		"md5":            {md5, "MD5"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(tc.input, "alice@gnuweeb.org")
+			_, err := Parse(tc.input, "alice@gnuweeb.org", time.Now())
 			if err == nil {
 				t.Fatal("accepted")
 			}
@@ -207,4 +223,55 @@ func userIDSig(t *testing.T, signer, target *openpgp.Entity, uid string, sigType
 		t.Fatal(err)
 	}
 	return sig
+}
+
+func TestParseUsabilityRule(t *testing.T) {
+	now := created.Add(time.Hour)
+	expiring, err := openpgp.NewEntity("Alice", "", "alice@gnuweeb.org", keyConfig(time.Minute, crypto.SHA256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The address's User ID bound only with SHA-1, on a key that is
+	// usable through its other User ID.
+	sha1UID, err := openpgp.NewEntity("Alice", "", "alice@example.org", keyConfig(0, crypto.SHA256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sha1UID.AddUserId("Alice", "", "alice@gnuweeb.org", keyConfig(0, crypto.SHA256)); err != nil {
+		t.Fatal(err)
+	}
+	sha1Only(t, sha1UID, "Alice <alice@gnuweeb.org>")
+
+	for name, tc := range map[string]struct {
+		input   []byte
+		address string
+		want    string
+	}{
+		"expired":          {public(t, expiring), "alice@gnuweeb.org", "expired on"},
+		"dsa":              {dsaKey, "dave@gnuweeb.org", "uses DSA"},
+		"sha-1 address id": {public(t, sha1UID), "alice@gnuweeb.org", "self-signed only with a hash"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse(tc.input, tc.address, now)
+			var u *Unusable
+			if !errors.As(err, &u) {
+				t.Fatalf("Parse error = %v, want *Unusable", err)
+			}
+			if !strings.Contains(u.Problem.Text, tc.want) || u.Problem.Fix == "" {
+				t.Errorf("problem = %+v, want one that mentions %q and says how to fix it", u.Problem, tc.want)
+			}
+		})
+	}
+
+	// A revoked key is taken, so that the revocation is published.
+	revoked, err := openpgp.NewEntity("Alice", "", "alice@gnuweeb.org", keyConfig(0, crypto.SHA256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := revoked.Revoke(packet.KeyCompromised, "", keyConfig(0, crypto.SHA256)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(public(t, revoked), "alice@gnuweeb.org", now); err != nil {
+		t.Errorf("revoked key refused: %v", err)
+	}
 }

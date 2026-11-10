@@ -43,12 +43,23 @@ type Key struct {
 	WKD []byte
 }
 
+// Unusable is the error Parse returns for a key that the usability rule
+// refuses; Problem says why and how to fix it.
+type Unusable struct {
+	Problem Problem
+}
+
+func (e *Unusable) Error() string { return strings.TrimSuffix(e.Problem.Text, ".") }
+
 // Parse checks an uploaded key for the member with the given address and
 // returns it with its WKD view. The input may be ASCII-armored or binary.
 // It must hold exactly one public key, no secret key material, and a
-// User ID with the address that is self-signed and not revoked. The
-// errors are meant to be shown to the member.
-func Parse(input []byte, address string) (*Key, error) {
+// User ID with the address that is self-signed and not revoked. The key
+// must be usable at the time now (see Check), with the address's User ID
+// self-signed with an accepted hash; a revoked key is accepted so that
+// the revocation reaches those who fetch it. The errors are meant to be
+// shown to the member.
+func Parse(input []byte, address string, now time.Time) (*Key, error) {
 	if len(input) > MaxSize {
 		return nil, fmt.Errorf("the key is larger than %d KiB", MaxSize>>10)
 	}
@@ -80,19 +91,63 @@ func Parse(input []byte, address string) (*Key, error) {
 
 	ent, err := readKey(data)
 	if err != nil {
+		if alg := unsupportedHash(pkts); alg != "" {
+			return nil, fmt.Errorf("the key's signatures use %s, which is no longer accepted; create a new key", alg)
+		}
 		return nil, fmt.Errorf("the key cannot be read: %w", err)
 	}
-	if !hasAddress(ent, address) {
+	if !hasAddress(ent, address, permissive) {
 		return nil, fmt.Errorf("the key has no valid, unrevoked User ID with the address %s", address)
+	}
+	fpr := fmt.Sprintf("%X", ent.PrimaryKey.Fingerprint)
+	h, err := Check(data, now)
+	if err != nil {
+		return nil, fmt.Errorf("the key cannot be read: %w", err)
+	}
+	if !h.Usable && !ent.Revoked(now) {
+		return nil, &Unusable{h.Problems[0]}
+	}
+	strict, err := readKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("the key cannot be read: %w", err)
+	}
+	if !ent.Revoked(now) && !hasAddress(strict, address, policy) {
+		return nil, &Unusable{Problem{
+			Severe:   true,
+			Text:     "The User ID with " + address + " is self-signed only with a hash that is no longer accepted.",
+			Fix:      weakHashFix,
+			Commands: resignCommands(fpr),
+		}}
 	}
 
 	view := wkdView(pkts, ent.PrimaryKey)
 	return &Key{
-		Fingerprint: fmt.Sprintf("%X", ent.PrimaryKey.Fingerprint),
+		Fingerprint: fpr,
 		Created:     ent.PrimaryKey.CreationTime,
 		Data:        data,
 		WKD:         view,
 	}, nil
+}
+
+// unsupportedHash names MD5 or RIPEMD-160 when a signature in pkts uses
+// it. go-crypto does not read such signatures at all, so a key that has
+// only those cannot be read.
+func unsupportedHash(pkts []rawPacket) string {
+	for _, p := range pkts {
+		body := p.raw[p.hdr:]
+		// A v4 signature starts with version, type, public key algorithm
+		// and hash algorithm (RFC 9580, section 5.2.3).
+		if p.tag != tagSignature || len(body) < 4 || body[0] != 4 {
+			continue
+		}
+		switch body[3] {
+		case 1:
+			return "MD5"
+		case 3:
+			return "RIPEMD-160"
+		}
+	}
+	return ""
 }
 
 func dearmor(input []byte) ([]byte, error) {
@@ -144,14 +199,15 @@ func readKey(data []byte) (*openpgp.Entity, error) {
 	return ents[0], nil
 }
 
-// hasAddress reports whether ent has a self-signed, unrevoked User ID
-// whose mail address is address, compared case-insensitively.
-func hasAddress(ent *openpgp.Entity, address string) bool {
+// hasAddress reports whether ent has a User ID whose mail address is
+// address, compared case-insensitively, that is self-signed and not
+// revoked when judged by cfg.
+func hasAddress(ent *openpgp.Entity, address string, cfg *packet.Config) bool {
 	for _, id := range ent.Identities {
 		if !strings.EqualFold(userIDAddress(id.UserId), address) {
 			continue
 		}
-		if _, err := id.Verify(time.Time{}, permissive); err == nil {
+		if _, err := id.Verify(time.Time{}, cfg); err == nil {
 			return true
 		}
 	}
