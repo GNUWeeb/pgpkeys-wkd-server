@@ -4,7 +4,7 @@
 
 `matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and gives members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: phases 1 to 5 of `ROADMAP.md` are implemented in this repository; the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
+**Status: phases 1 to 6 of `ROADMAP.md` are implemented in this repository; the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
 
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
@@ -14,7 +14,7 @@
 One process, two HTTP listeners, one SQLite database:
 
 ```
-cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.New(..., mail.New(SMTP)) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown -> wait for login mails in flight
+cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.New(..., mail.New(SMTP)) -> reminder loop in a goroutine -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown -> wait for the reminder loop and for login mails in flight
 ```
 
 - **WKD listener** (`WKD_ADDR`, `wkd.NewHandler`): `GET`/`HEAD /.well-known/openpgpkey/hu/<hash>` returns the WKD views of every key stored under that hash, concatenated newest first (key creation time), as `application/octet-stream`; 404 when there is none or the hash is malformed. `?l=` is ignored. `GET /.well-known/openpgpkey/policy` is one comment line. Only the nginx in front of `gnuweeb.org` is meant to reach this listener.
@@ -22,9 +22,13 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 `serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
 
-**Keys** (`internal/keys`): `keys.Parse(input, address)` accepts armored or binary input up to 1 MiB holding exactly one public key with a self-signed, unrevoked User ID whose address matches (case-insensitively); secret keys are refused. It returns the key as uploaded (binary) and its **WKD view**, built from the raw packets: signatures after a User ID or User Attribute are kept only when the primary key issued them, identities left without a signature are dropped, signatures on the primary key and subkeys are kept (so designated-revoker revocations reach clients), and trust, marker and other packets are dropped. All User IDs stay, as on kernel.org.
+**Keys** (`internal/keys`, go-crypto's v2 API `openpgp/v2`): `keys.Parse(input, address, now)` accepts armored or binary input up to 1 MiB holding exactly one public key with a self-signed, unrevoked User ID whose address matches (case-insensitively); secret keys are refused. The key must also pass the usability rule at `now`, with the address's User ID self-signed with an accepted hash; a revoked key is accepted so its revocation gets published. A refusal by the rule is a `*keys.Unusable` carrying the `Problem`. It returns the key as uploaded (binary) and its **WKD view**, built from the raw packets: signatures after a User ID or User Attribute are kept only when the primary key issued them, identities left without a signature are dropped, signatures on the primary key and subkeys are kept (so designated-revoker revocations reach clients), and trust, marker and other packets are dropped. All User IDs stay, as on kernel.org.
 
-**Store** (`internal/store`): table `keys`, unique on `(address, fingerprint)`; re-uploading a key replaces it. `wkd_hash` is derived from the address inside `PutKey`, never passed in. Addresses are stored as given, so callers normalize them first. Schema changes are appended to `migrations` in `store.go` (tracked by `PRAGMA user_version`); never edit a released migration.
+**Key health** (`health.go`): `keys.Check(data, now)` applies kernel.org's usability rule (what `sq` accepts) through go-crypto's policy (`policy`): a key is usable when its primary key is valid and at least one key may sign; self-signatures with MD5, SHA-1 or RIPEMD-160 do not count; DSA, ElGamal, RSA under 2048 bits and refused curves cannot sign. It returns `Usable`, `SigningUntil` (the latest end of a usable signing key, each capped by the primary key's expiry, as kernel.org's `pgpkey-expiry.py` computes it) and `Problems`, each with the fix and the GnuPG commands. go-crypto caches each signature's verdict in the parsed key, including expiry at the time asked, so `Check` reads the key three times and asks each copy one kind of question; keep it that way. `permissive` (in `keys.go`) judges signatures without any algorithm policy, for listing User IDs. GnuPG 2.4 keeps the hash of a self-signature it replaces, so the commands that repair a weak hash pass `--cert-digest-algo SHA512`.
+
+**Store** (`internal/store`): table `keys`, unique on `(address, fingerprint)`; re-uploading a key replaces it and keeps its row ID. `wkd_hash` is derived from the address inside `PutKey`, never passed in. Addresses are stored as given, so callers normalize them first. `expiry_reminders` holds, per key row (deleted with it), the date and threshold of the last reminder mailed. Schema changes are appended to `migrations` in `store.go` (tracked by `PRAGMA user_version`); never edit a released migration.
+
+**Reminders** (`internal/reminder`): `Loop` runs `Run` at start and then every 24 hours. `Run` checks every stored key and mails its address 30, 10 and 3 days before `SigningUntil` (thresholds in `reminder.go`, the longest is `keys.ExpiryNotice`), once per date and threshold; a new date starts over, a failed mail is retried on the next run, and keys that already cannot sign are only logged.
 
 **WKD hash** (`wkd.Hash`): the local-part with only ASCII upper case lower-cased, SHA-1, z-base-32; tested against the draft's vector and two kernel.org entries.
 
@@ -39,7 +43,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 **Mail** (`internal/mail`): `net/smtp` with `SMTP_TLS` `starttls` (required, not opportunistic), `implicit` or `none`; `PLAIN` auth when a username is set. Plain-text body, CRLF, header values checked for CR/LF.
 
-**Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked). Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
+**Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422, a `*keys.Unusable` with its fix and commands. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked, and the `Health` from `keys.Check`); keys with problems get a "What to fix" notice below the table. Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
 
 **Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate. Every page works without JavaScript; htmx (`hx-boost` on `<body>`) only swaps pages in place. Its config (`htmxConfig` in `layout.templ`) disables eval and inline styles, as the CSP requires, and swaps 4xx/5xx responses so form errors show.
 
@@ -49,8 +53,9 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 - `cmd/matcha/` - the binary: wiring, signal handling, server lifecycle.
 - `internal/config/` - settings from the environment.
-- `internal/keys/` - upload checks and the WKD view.
+- `internal/keys/` - upload checks, the WKD view and the usability rule; `testdata/` holds a DSA key made with GnuPG.
 - `internal/mail/` - SMTP client.
+- `internal/reminder/` - the daily key check and expiry reminder mails.
 - `internal/store/` - SQLite database and migrations.
 - `internal/web/` - dashboard handlers and middleware; `internal/web/ui/` - templ components; `internal/web/static/` - embedded CSS, htmx, fonts.
 - `internal/wkd/` - WKD hash and HTTP routes.
@@ -85,8 +90,9 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `ROADMAP.md` - plan for the rewrite: goal, decisions, kernel.org reference model, WKD behaviour, phases, open items.
 - `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
 - `internal/config/config.go` - every environment variable and its default.
-- `internal/keys/keys.go` - `Parse` and `wkdView`; `describe.go` - `Describe`; `packets.go` splits raw packets.
-- `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions.
+- `internal/keys/keys.go` - `Parse` and `wkdView`; `health.go` - `Check` and the policy; `describe.go` - `Describe`; `packets.go` splits raw packets.
+- `internal/reminder/reminder.go` - reminder thresholds, the mail text, `Loop` and `Run`.
+- `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions; `reminders.go` - reminder state.
 - `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `keys.go`, `session.go`, `csrf.go`, `ratelimit.go`, `assets.go`.
 - `internal/web/ui/layout.templ` - page frame (bare before login, sidebar after), htmx config; `login.templ`, `keys.templ`.
 - `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
@@ -98,7 +104,7 @@ Configuration is read from the environment only; the binary does not read `.env`
 ## Runtime/Tooling Preferences
 
 - Go 1.27 (`go.mod`); module path `git.gnuweeb.net/GNUWeeb/matcha`. `CGO_ENABLED=0` builds must keep working, so no cgo dependencies.
-- Dependencies: `github.com/ProtonMail/go-crypto` (OpenPGP; not the deprecated `golang.org/x/crypto/openpgp`), `modernc.org/sqlite` (pure Go, driver name `sqlite`), `github.com/go-chi/chi/v5`, `github.com/a-h/templ` (library, and the generator as a `tool` in `go.mod`), `golang.org/x/sync`. Prefer the standard library.
+- Dependencies: `github.com/ProtonMail/go-crypto` (OpenPGP through its v2 API `openpgp/v2`, the one that applies algorithm policy; not the deprecated `golang.org/x/crypto/openpgp`), `modernc.org/sqlite` (pure Go, driver name `sqlite`), `github.com/go-chi/chi/v5`, `github.com/a-h/templ` (library, and the generator as a `tool` in `go.mod`), `golang.org/x/sync`. Prefer the standard library.
 - Default branch `master`; release tags are bare semver (`1.0.1`).
 - Hosting: `origin` is `git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server` (GitLab; renaming the project to `matcha` waits on the owner). There is no CI: no `.gitlab-ci.yml`, and the GitHub workflows were deleted.
 

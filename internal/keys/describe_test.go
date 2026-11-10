@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 )
 
 func TestDescribe(t *testing.T) {
@@ -42,7 +42,7 @@ func TestDescribe(t *testing.T) {
 		t.Error("not expired after its lifetime")
 	}
 
-	if err := e.RevokeKey(packet.KeyCompromised, "", cfg); err != nil {
+	if err := e.Revoke(packet.KeyCompromised, "", cfg); err != nil {
 		t.Fatal(err)
 	}
 	if info, _ := Describe(public(t, e), created.Add(time.Hour)); !info.Revoked {

@@ -42,7 +42,7 @@ Settled by the maintainer on 2026-11-11:
 | Rename | Yes, as part of the rewrite, to `matcha`. Renaming the GitLab project changes the URL given in the handover, so that step needs the owner's agreement. |
 | Language | Go, with `github.com/ProtonMail/go-crypto` for OpenPGP and templ, chi and htmx for the dashboard (greentea's stack). Bun and Rust with Sequoia were considered and dropped. |
 | Storage | SQLite: one file, no extra service. |
-| Key-health checker | `sq` (Sequoia) run as a subprocess, as kernel.org's scripts do. Debian 13 packages `sq` 1.3.1. |
+| Key-health checker | Go, in the service, with go-crypto's v2 API and its policy settings (decided 2026-11-11, replacing `sq`). kernel.org runs `sq inspect` (`pgpkey-expiry.py` in `pgpkeys.git`), but `sq` 1.3.1 has no machine-readable output for it, adds a 22 MB binary and its libraries to the image, and its text changes between releases. Accepted cost: the rule follows Sequoia's standard policy as listed in phase 6, not its every date-dependent detail. |
 | Go module path | `git.gnuweeb.net/GNUWeeb/matcha`, the URL the project gets once renamed. |
 | Listeners | Two addresses: `WKD_ADDR` for the WKD routes, reachable only by the `gnuweeb.org` nginx, and `DASHBOARD_ADDR` for `pgp.gnuweeb.org`. Dashboard routes do not exist on the WKD listener and the reverse. |
 | Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
@@ -123,7 +123,7 @@ The store keeps each key as submitted, including third-party certifications (nee
 
 Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 9 are the kernel.org-style additions.
 
-Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 9 are not to be started until asked for. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8; the next work is chosen from phases 6, 7 and 9.
+Current scope (maintainer, 2026-11-11): phases 6, 7 and 9, after phases 1 to 5. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8.
 
 ### 1. Tooling and rename
 
@@ -190,6 +190,8 @@ Status: the repository's part is done 2026-11-11; the production part is not. In
 - Mail a reminder 30, 10 and 3 days before a key expires.
 - Expired keys stay available so old signatures remain checkable.
 
+Status: done 2026-11-11, in Go (see the decision on the key-health checker). `keys.Check` applies the rule on upload and in the dashboard; a check at start and then daily mails the reminders and logs keys that cannot sign. Decided here: a refused upload explains the problem with the GnuPG commands that fix it; a revoked key is accepted, so that the revocation gets published; the dashboard warns from 30 days before a key stops signing. Checked against `sq` 1.3.1 (Debian 13) with keys made by GnuPG 2.4.9: both agree on a sound key, a key whose signing subkey expires first, an expired key, a key self-signed with SHA-1 (refused) and an RSA-1024 key (refused); they differ on DSA (see "Open Items"). With a local instance and Mailpit, the list showed the problem and its commands in light and dark and at 390 px, a SHA-1 key was refused with its fix, and a restart mailed one reminder 10 days before a signing subkey ended and none on the next restart.
+
 ### 7. Keyring export
 
 - Write `keys/<FINGERPRINT>.asc` (and `keys/expired/`) from the store into a local directory laid out like kernel.org's `pgpkeys.git`, so `gpg --import keys/*.asc` works on it. Armored, all User IDs and certifications as stored; the same store gives the same bytes, so an unchanged store produces no diff.
@@ -223,6 +225,8 @@ greentea is Go with templ templates. Its stylesheet is a reference, not a source
 
 - Checked in phase 2: `go-crypto`'s `Identity.Signatures` holds every signature on a User ID, self-signatures included, not only third-party ones; `ReadKeyRing` rejects a key whose User ID self-signature does not verify and lists only self-signed User IDs. GnuPG accepts the WKD view (`--check-sigs`: all good), and a certification by another key verifies with `VerifyUserIdSignature`.
 - Chosen in phase 2: `modernc.org/sqlite`, a pure-Go driver, so `CGO_ENABLED=0` builds keep working.
+- Checked in phase 6: `sq` 1.3.1 accepts a DSA-2048 key made by GnuPG 2.4.9, so "DSA keys are rejected" in the kernel.org reference model does not hold for `sq` itself. The rule here refuses DSA, as phase 6 lists it.
+- Checked in phase 6: GnuPG 2.4.9 keeps the hash of the self-signature it replaces, so `gpg --quick-set-expire` alone left a SHA-1 key on SHA-1; with `--cert-digest-algo SHA512` the new self-signatures used SHA-512 and the key passed. kernel.org's documentation says a recent GnuPG repairs such keys; 2.4.9 does not.
 - Renaming the GitLab project needs the owner's agreement.
 
 ## References

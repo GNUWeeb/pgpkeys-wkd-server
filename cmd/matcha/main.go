@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/config"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/mail"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/reminder"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
@@ -44,17 +46,24 @@ func run(log *slog.Logger) error {
 	}
 	defer st.Close()
 
+	mailer := mail.New(cfg.SMTP)
 	dash := web.New(web.Options{
 		Domain:       cfg.EmailDomain,
 		BaseURL:      cfg.BaseURL,
 		RealIPHeader: cfg.RealIPHeader,
-	}, st, mail.New(cfg.SMTP), log)
+	}, st, mailer, log)
+
+	// The daily key check mails expiry reminders until shutdown.
+	var reminders sync.WaitGroup
+	reminders.Go(func() { reminder.New(st, mailer, cfg.BaseURL, log).Loop(ctx, time.Now) })
 
 	servers := []*http.Server{
 		newServer(cfg.WKDAddr, wkd.NewHandler(st, log)),
 		newServer(cfg.DashboardAddr, dash),
 	}
 	err = serve(ctx, log, servers)
+	stop()
+	reminders.Wait()
 	dash.Wait()
 	return err
 }

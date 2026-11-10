@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -70,7 +71,7 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {
 	p := s.page(r, "Add key")
 	p.Nav = "/"
-	s.render(w, r, http.StatusOK, ui.AddKey(p, "", "", keys.MaxSize>>10))
+	s.render(w, r, http.StatusOK, ui.AddKey(p, "", "", nil, keys.MaxSize>>10))
 }
 
 // addKey stores an uploaded key: the chosen file if there is one, the
@@ -91,18 +92,23 @@ func (s *Server) addKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fail := func(msg string) {
+	fail := func(msg string, fix *keys.Problem) {
 		p := s.page(r, "Add key")
 		p.Nav = "/"
-		s.render(w, r, http.StatusUnprocessableEntity, ui.AddKey(p, pasted, msg, keys.MaxSize>>10))
+		s.render(w, r, http.StatusUnprocessableEntity, ui.AddKey(p, pasted, msg, fix, keys.MaxSize>>10))
 	}
 	if len(strings.TrimSpace(string(input))) == 0 {
-		fail("Paste a key or choose a file.")
+		fail("Paste a key or choose a file.", nil)
 		return
 	}
-	k, err := keys.Parse(input, addr)
+	k, err := keys.Parse(input, addr, s.now())
 	if err != nil {
-		fail("This key cannot be added: " + err.Error() + ".")
+		var u *keys.Unusable
+		if errors.As(err, &u) {
+			fail("This key cannot be added. "+u.Problem.Text, &u.Problem)
+			return
+		}
+		fail("This key cannot be added: "+err.Error()+".", nil)
 		return
 	}
 	if err := s.store.PutKey(r.Context(), addr, k, s.now()); err != nil {
