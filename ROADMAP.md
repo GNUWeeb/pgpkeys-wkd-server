@@ -171,6 +171,8 @@ Status: done 2026-11-11. In containers, nginx with a test CA proxied `https://pg
 
 Done when: add and remove work in a browser, with and without JavaScript, in light and dark themes.
 
+Status: done 2026-11-11. In headless Chromium against a local instance (mail through Mailpit), login, adding a pasted key, removal and logout went through in all four combinations of JavaScript on or off and the light or dark scheme: with JavaScript as htmx requests, without as plain form posts. Also checked: adding a key from a file without JavaScript, and a rejected upload showing its error on the form with and without JavaScript. No console or CSP errors. At 390 px wide the sidebar becomes a bar above the content. Tests cover adding, removing, rejected uploads, a member reaching another member's key (404) or publishing a key for another address (422), pages without login, and static files. Decided here: removal uses a confirmation page instead of a script dialog, so it works without JavaScript; the theme follows the device only (no switch); the fonts are greentea's Latin cuts of Inter and JetBrains Mono (OFL), and htmx comes from the `htmx.org` npm package (0BSD), whose `htmx.min.js` is byte for byte greentea's.
+
 ### 5. Deployment
 
 - DNS record for `pgp.gnuweeb.org`; TLS.
