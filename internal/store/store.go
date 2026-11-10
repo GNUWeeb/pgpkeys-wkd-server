@@ -45,6 +45,12 @@ var migrations = []string{
 		created_at INTEGER NOT NULL,
 		expires_at INTEGER NOT NULL
 	);`,
+	`CREATE TABLE expiry_reminders (
+		key_id     INTEGER PRIMARY KEY REFERENCES keys (id) ON DELETE CASCADE,
+		expires_at INTEGER NOT NULL,
+		days       INTEGER NOT NULL,
+		sent_at    INTEGER NOT NULL
+	);`,
 }
 
 // Open opens or creates the database at path and brings its schema up to

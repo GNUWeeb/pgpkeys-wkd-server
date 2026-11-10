@@ -11,6 +11,9 @@ import (
 
 // StoredKey is a key as the store holds it for one address.
 type StoredKey struct {
+	// ID identifies the key for this address; it stays when the key is
+	// uploaded again.
+	ID          int64
 	Address     string
 	Fingerprint string
 	Created     time.Time
@@ -38,9 +41,20 @@ func (s *Store) PutKey(ctx context.Context, address string, k *keys.Key, now tim
 
 // Keys returns the keys stored for address, newest first.
 func (s *Store) Keys(ctx context.Context, address string) ([]StoredKey, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT address, fingerprint, created_at, uploaded_at, data FROM keys
+	return s.queryKeys(ctx, `
+		SELECT id, address, fingerprint, created_at, uploaded_at, data FROM keys
 		WHERE address = ? ORDER BY created_at DESC, id DESC`, address)
+}
+
+// AllKeys returns every stored key, by address and then newest first.
+func (s *Store) AllKeys(ctx context.Context) ([]StoredKey, error) {
+	return s.queryKeys(ctx, `
+		SELECT id, address, fingerprint, created_at, uploaded_at, data FROM keys
+		ORDER BY address, created_at DESC, id DESC`)
+}
+
+func (s *Store) queryKeys(ctx context.Context, query string, args ...any) ([]StoredKey, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +63,7 @@ func (s *Store) Keys(ctx context.Context, address string) ([]StoredKey, error) {
 	for rows.Next() {
 		var k StoredKey
 		var created, uploaded int64
-		if err := rows.Scan(&k.Address, &k.Fingerprint, &created, &uploaded, &k.Data); err != nil {
+		if err := rows.Scan(&k.ID, &k.Address, &k.Fingerprint, &created, &uploaded, &k.Data); err != nil {
 			return nil, err
 		}
 		k.Created, k.Uploaded = time.Unix(created, 0), time.Unix(uploaded, 0)
