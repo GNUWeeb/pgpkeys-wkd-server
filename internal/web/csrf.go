@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"net/http"
+	"strings"
 )
 
 // The CSRF token lives in a __Host- cookie, which only this host can set
@@ -33,20 +35,41 @@ func (s *Server) csrf(next http.Handler) http.Handler {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 		default:
 			r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+			fail := func(status int, heading, text string) {
+				r = r.WithContext(context.WithValue(r.Context(), csrfKey{}, s.setCSRFCookie(w, token)))
+				s.message(w, r, status, heading, text, r.URL.Path, "Back")
+			}
+			if err := parseForm(r); err != nil {
+				var tooLarge *http.MaxBytesError
+				if errors.As(err, &tooLarge) {
+					fail(http.StatusRequestEntityTooLarge, "Too large", "The form was larger than the server accepts.")
+				} else {
+					fail(http.StatusBadRequest, "Bad request", "The form could not be read.")
+				}
+				return
+			}
 			sent := r.Header.Get("X-CSRF-Token")
 			if sent == "" {
 				sent = r.PostFormValue("csrf_token")
 			}
 			if token == "" || subtle.ConstantTimeCompare([]byte(sent), []byte(token)) != 1 {
-				r = r.WithContext(context.WithValue(r.Context(), csrfKey{}, s.setCSRFCookie(w, token)))
-				s.message(w, r, http.StatusForbidden, "Form expired",
-					"The form was sent without a valid security token. Load the page again and retry.", r.URL.Path, "Reload")
+				fail(http.StatusForbidden, "Form expired",
+					"The form was sent without a valid security token. Load the page again and retry.")
 				return
 			}
 		}
 		token = s.setCSRFCookie(w, token)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), csrfKey{}, token)))
 	})
+}
+
+// parseForm reads the request body as a form, multipart or not, within
+// the cap set on the body.
+func parseForm(r *http.Request) error {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		return r.ParseMultipartForm(maxBody)
+	}
+	return r.ParseForm()
 }
 
 // setCSRFCookie issues a new token when there is none and returns the

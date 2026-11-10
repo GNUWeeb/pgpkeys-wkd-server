@@ -42,10 +42,6 @@ func validLocalPart(s string) bool {
 	return true
 }
 
-func (s *Server) home(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, ui.Home(s.page(r, "Keys")))
-}
-
 func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
 	if sessionAddress(r) != "" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)

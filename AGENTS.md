@@ -18,7 +18,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 ```
 
 - **WKD listener** (`WKD_ADDR`, `wkd.NewHandler`): `GET`/`HEAD /.well-known/openpgpkey/hu/<hash>` returns the WKD views of every key stored under that hash, concatenated newest first (key creation time), as `application/octet-stream`; 404 when there is none or the hash is malformed. `?l=` is ignored. `GET /.well-known/openpgpkey/policy` is one comment line. Only the nginx in front of `gnuweeb.org` is meant to reach this listener.
-- **Dashboard listener** (`DASHBOARD_ADDR`, `web.New`, chi router): login by mailed link; after login a placeholder start page.
+- **Dashboard listener** (`DASHBOARD_ADDR`, `web.New`, chi router): login by mailed link, then the member's keys: list (`GET /`), add (`GET /keys/new`, `POST /keys`, pasted text or a file), remove with a confirmation page (`GET`/`POST /keys/{fpr}/remove`). Static files under `/static/` sit outside the CSRF and session middleware, so they set no cookies.
 
 `serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
 
@@ -39,7 +39,11 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 
 **Mail** (`internal/mail`): `net/smtp` with `SMTP_TLS` `starttls` (required, not opportunistic), `implicit` or `none`; `PLAIN` auth when a username is set. Plain-text body, CRLF, header values checked for CR/LF.
 
-**Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate.
+**Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked). Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
+
+**Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate. Every page works without JavaScript; htmx (`hx-boost` on `<body>`) only swaps pages in place. Its config (`htmxConfig` in `layout.templ`) disables eval and inline styles, as the CSP requires, and swaps 4xx/5xx responses so form errors show.
+
+**Static files** (`internal/web/static`, embedded by `assets.go`): `matcha.css` (written here after greentea's look; light and dark by `prefers-color-scheme`; no inline styles anywhere, the CSP forbids them), `favicon.svg`, `htmx.min.js` 2.0.11 (0BSD, `htmx-LICENSE.txt`), Inter and JetBrains Mono `woff2` (OFL, `*-OFL.txt`, the Latin cuts greentea ships). URLs carry `?v=<sha256 prefix>` and are cached for a year; `url("name")` references inside the stylesheet are rewritten to versioned URLs at startup. Do not copy greentea's stylesheet (it has no license).
 
 ## Key Directories
 
@@ -48,7 +52,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 - `internal/keys/` - upload checks and the WKD view.
 - `internal/mail/` - SMTP client.
 - `internal/store/` - SQLite database and migrations.
-- `internal/web/` - dashboard handlers and middleware; `internal/web/ui/` - templ components.
+- `internal/web/` - dashboard handlers and middleware; `internal/web/ui/` - templ components; `internal/web/static/` - embedded CSS, htmx, fonts.
 - `internal/wkd/` - WKD hash and HTTP routes.
 
 There is no `scripts/` or `docs/` directory.
@@ -79,9 +83,10 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `ROADMAP.md` - plan for the rewrite: goal, decisions, kernel.org reference model, WKD behaviour, phases, open items.
 - `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
 - `internal/config/config.go` - every environment variable and its default.
-- `internal/keys/keys.go` - `Parse` and `wkdView`; `packets.go` splits raw packets.
+- `internal/keys/keys.go` - `Parse` and `wkdView`; `describe.go` - `Describe`; `packets.go` splits raw packets.
 - `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions.
-- `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `session.go`, `csrf.go`, `ratelimit.go`.
+- `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `keys.go`, `session.go`, `csrf.go`, `ratelimit.go`, `assets.go`.
+- `internal/web/ui/layout.templ` - page frame (bare before login, sidebar after), htmx config; `login.templ`, `keys.templ`.
 - `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
 - `.env.example` - documented settings; copy to `.env` (gitignored).
 - `Dockerfile` - Go build stage, Debian slim runtime, static binary, CA bundle copied from the build stage (for SMTP TLS), non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
