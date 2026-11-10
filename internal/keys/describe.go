@@ -15,6 +15,8 @@ type Info struct {
 	Expires time.Time
 	Expired bool
 	Revoked bool
+	// Health is the key judged by the usability rule at the same time.
+	Health Health
 }
 
 // Describe reads a key stored by Parse.
@@ -48,6 +50,9 @@ func Describe(data []byte, now time.Time) (Info, error) {
 	if sig, _ := ent.PrimarySelfSignature(time.Time{}, permissive); sig != nil && sig.KeyLifetimeSecs != nil && *sig.KeyLifetimeSecs > 0 {
 		info.Expires = info.Created.Add(time.Duration(*sig.KeyLifetimeSecs) * time.Second)
 		info.Expired = now.After(info.Expires)
+	}
+	if info.Health, err = Check(data, now); err != nil {
+		return Info{}, err
 	}
 	return info, nil
 }

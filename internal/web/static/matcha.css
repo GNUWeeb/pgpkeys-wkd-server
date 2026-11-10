@@ -497,6 +497,64 @@ main:focus {
 	color: var(--danger);
 }
 
+.flash > :last-child {
+	margin-bottom: 0;
+}
+
+/* What to fix: one notice per key with its problems and the commands
+   that fix them. */
+
+.fixes {
+	margin: 0 0 var(--block-gap);
+}
+
+.fixes h2 {
+	margin: 0 0 var(--space-3);
+	font-size: var(--text-md);
+	font-weight: 650;
+}
+
+.notice {
+	margin: 0 0 var(--space-3);
+	padding: var(--space-4) var(--space-5);
+	border: 1px solid var(--border);
+	border-left: 4px solid var(--warn);
+	border-radius: var(--radius);
+	background: var(--surface);
+	overflow-wrap: anywhere;
+}
+
+.notice.danger {
+	border-left-color: var(--danger);
+}
+
+.notice > :last-child {
+	margin-bottom: 0;
+}
+
+.notice .fpr {
+	padding: 0;
+	background: none;
+	color: var(--muted);
+	word-spacing: 0.1em;
+}
+
+.cmd {
+	margin: 0 0 var(--space-3);
+	padding: var(--space-3);
+	overflow-x: auto;
+	border-radius: var(--radius-sm);
+	background: var(--surface-2);
+	color: var(--text);
+	font-size: var(--text-sm);
+}
+
+.cmd code {
+	padding: 0;
+	background: none;
+	overflow-wrap: normal;
+}
+
 .empty {
 	display: flex;
 	flex-direction: column;
@@ -620,12 +678,19 @@ textarea:focus-visible {
 	border-bottom: none;
 }
 
+/* A narrow screen scrolls the table rather than squeezing a fingerprint
+   or User ID into a column a few characters wide. */
 .tbl .fpr {
 	display: inline-block;
+	min-width: 10rem;
 	max-width: 16rem;
 	padding: 0;
 	background: none;
 	word-spacing: 0.1em;
+}
+
+.tbl .uids {
+	min-width: 10rem;
 }
 
 .tbl td time {

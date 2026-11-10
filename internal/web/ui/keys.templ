@@ -40,9 +40,56 @@ templ keyStatus(k keys.Info) {
 			<span class="badge danger">Revoked</span>
 		case k.Expired:
 			<span class="badge warn">Expired</span>
+		case !k.Health.Usable:
+			<span class="badge danger">Cannot sign</span>
+		case hasSevere(k.Health):
+			<span class="badge warn">Signing ends soon</span>
 		default:
 			<span class="badge ok">Valid</span>
 	}
+}
+
+func hasSevere(h keys.Health) bool {
+	for _, p := range h.Problems {
+		if p.Severe {
+			return true
+		}
+	}
+	return false
+}
+
+// problem says what is wrong with a key and how to fix it.
+templ problem(p keys.Problem) {
+	<p><strong>{ p.Text }</strong> { p.Fix }</p>
+	if len(p.Commands) > 0 {
+		<pre class="cmd"><code>{ strings.Join(p.Commands, "\n") }</code></pre>
+	}
+}
+
+// fixes lists, per key, what its owner should fix.
+templ fixes(list []keys.Info) {
+	<section class="fixes" aria-labelledby="fixes-title">
+		<h2 id="fixes-title">What to fix</h2>
+		for _, k := range list {
+			if len(k.Health.Problems) > 0 {
+				<article class={ "notice", templ.KV("danger", hasSevere(k.Health)) }>
+					<p class="notice-key"><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></p>
+					for _, p := range k.Health.Problems {
+						@problem(p)
+					}
+				</article>
+			}
+		}
+	</section>
+}
+
+func anyProblems(list []keys.Info) bool {
+	for _, k := range list {
+		if len(k.Health.Problems) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Keys lists the member's keys, newest first, as WKD serves them.
@@ -105,14 +152,17 @@ templ Keys(p Page, list []keys.Info, f Flash, wkdURL string) {
 					</tbody>
 				</table>
 			</div>
-			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there.</p>
+			if anyProblems(list) {
+				@fixes(list)
+			}
+			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies.</p>
 		}
 	}
 }
 
 // AddKey is the upload form; pasted and errText refill it after an
-// error.
-templ AddKey(p Page, pasted, errText string, maxKiB int) {
+// error, and fix, when not nil, explains how to repair the key.
+templ AddKey(p Page, pasted, errText string, fix *keys.Problem, maxKiB int) {
 	@Layout(p) {
 		<header class="page-head">
 			<div>
@@ -121,7 +171,15 @@ templ AddKey(p Page, pasted, errText string, maxKiB int) {
 			</div>
 		</header>
 		if errText != "" {
-			<div class="flash danger" role="alert">{ errText }</div>
+			<div class="flash danger" role="alert">
+				<p>{ errText }</p>
+				if fix != nil {
+					<p>{ fix.Fix }</p>
+					if len(fix.Commands) > 0 {
+						<pre class="cmd"><code>{ strings.Join(fix.Commands, "\n") }</code></pre>
+					}
+				}
+			</div>
 		}
 		<form method="post" action="/keys" enctype="multipart/form-data" class="card stack">
 			@CSRFField(p.CSRF)

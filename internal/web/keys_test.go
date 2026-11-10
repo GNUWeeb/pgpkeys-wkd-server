@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
@@ -32,7 +33,12 @@ func (h *harness) loginAs(address string) *http.Client {
 // with its fingerprint.
 func armoredKey(t *testing.T, email string) (string, string) {
 	t.Helper()
-	e, err := openpgp.NewEntity("Test", "", email, &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	return armoredKeyWith(t, email, &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+}
+
+func armoredKeyWith(t *testing.T, email string, cfg *packet.Config) (string, string) {
+	t.Helper()
+	e, err := openpgp.NewEntity("Test", "", email, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,6 +105,41 @@ func TestAddAndRemoveKey(t *testing.T) {
 	}
 }
 
+func TestKeyListSaysWhatToFix(t *testing.T) {
+	h := newHarness(t)
+	start := h.now
+	key, fpr := armoredKeyWith(t, "alice@gnuweeb.org", &packet.Config{
+		Algorithm:       packet.PubKeyAlgoEdDSA,
+		KeyLifetimeSecs: 40 * 86400,
+		Time:            func() time.Time { return start },
+	})
+	if resp, _ := h.post(h.loginAs("alice@gnuweeb.org"), "/keys", url.Values{"key": {key}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("add: status %d", resp.StatusCode)
+	}
+	if _, body := h.get(h.loginAs("alice@gnuweeb.org"), "/"); strings.Contains(body, "What to fix") || !strings.Contains(body, ">Valid<") {
+		t.Error("a key with 40 days left is not shown as valid without anything to fix")
+	}
+
+	h.now = start.Add(20 * 24 * time.Hour)
+	_, body := h.get(h.loginAs("alice@gnuweeb.org"), "/")
+	for _, want := range []string{">Signing ends soon<", "What to fix", "Signing with this key stops on 2027-02-24.", "gpg --quick-set-expire " + fpr + " 5y"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("20 days before expiry, the list lacks %q", want)
+		}
+	}
+
+	h.now = start.Add(41 * 24 * time.Hour)
+	_, body = h.get(h.loginAs("alice@gnuweeb.org"), "/")
+	for _, want := range []string{">Expired<", "The key expired on 2027-02-24."} {
+		if !strings.Contains(body, want) {
+			t.Errorf("after expiry, the list lacks %q", want)
+		}
+	}
+	if n := h.wkdKeys("alice"); n != 1 {
+		t.Errorf("WKD serves %d keys after expiry, want the expired one still", n)
+	}
+}
+
 func groupedFpr(fpr string) string {
 	var parts []string
 	for i := 0; i < len(fpr); i += 4 {
@@ -133,12 +174,19 @@ func TestAddKeyRejects(t *testing.T) {
 	h := newHarness(t)
 	alice := h.loginAs("alice@gnuweeb.org")
 	bobKey, _ := armoredKey(t, "bob@gnuweeb.org")
+	expired, fpr := armoredKeyWith(t, "alice@gnuweeb.org", &packet.Config{
+		Algorithm:       packet.PubKeyAlgoEdDSA,
+		KeyLifetimeSecs: 86400,
+		Time:            func() time.Time { return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC) },
+	})
 	for name, tc := range map[string]struct {
 		key, want string
 	}{
 		"empty":         {"  ", "Paste a key or choose a file"},
 		"garbage":       {"hello", "malformed"},
 		"other address": {bobKey, "no valid, unrevoked User ID with the address alice@gnuweeb.org"},
+		"expired":       {expired, "The key expired on 2020-01-02.</p><p>Extend its expiry date"},
+		"expired fix":   {expired, "gpg --quick-set-expire " + fpr + " 5y"},
 	} {
 		resp, body := h.post(alice, "/keys", url.Values{"key": {tc.key}})
 		if resp.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(body, tc.want) {
