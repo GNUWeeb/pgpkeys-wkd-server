@@ -160,6 +160,8 @@ Status: done 2026-11-11. In containers on one network, nginx with a test CA serv
 
 Done when: a login round trip works against a local SMTP catcher, and expired, reused and forged tokens are rejected by tests.
 
+Status: done 2026-11-11. In containers, nginx with a test CA proxied `https://pgp.gnuweeb.test` to the image, which mailed through Mailpit with STARTTLS and `AUTH PLAIN` (and, in a second run, implicit TLS); with curl the link page answered 200 without using the token, the `POST` logged in with a `__Host-matcha-session` cookie (`Secure; HttpOnly; SameSite=Lax`), reusing the token answered 400 and logout ended the session. `internal/web/login_test.go` rejects expired, reused and forged tokens. Decided here: tokens are 256 random bits, kept as SHA-256 and valid 15 minutes; sessions last 7 days; at most 5 links per address and 20 requests per client per hour; mail is sent in the background so that neither the answer nor its timing depends on the address or on the mail server; CSRF uses a double-submit `__Host-` cookie, which also covers the login forms. `SMTP_TLS=starttls` fails rather than falls back when the server offers no STARTTLS.
+
 ### 4. Dashboard
 
 - Server-rendered HTML (templ) with htmx; no client-side framework, no CDN.
