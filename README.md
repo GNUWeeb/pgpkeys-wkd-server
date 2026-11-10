@@ -36,6 +36,7 @@ matcha reads its settings from the environment. `.env.example` lists them with t
 | --- | --- | --- |
 | `WKD_ADDR` | `127.0.0.1:8080` | Listen address of the WKD routes |
 | `DASHBOARD_ADDR` | `127.0.0.1:8081` | Listen address of the dashboard |
+| `DATABASE_PATH` | `matcha.db` | SQLite database file, created if missing |
 
 ### Running
 
@@ -48,10 +49,15 @@ set -a; . ./.env; set +a
 
 ```bash
 docker build -t matcha .
-docker run -d --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 --name matcha matcha
+docker run -d --env-file .env -v matcha-data:/var/lib/matcha \
+  -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 --name matcha matcha
 ```
 
-Inside the container both listeners bind every interface (`WKD_ADDR=:8080`, `DASHBOARD_ADDR=:8081`); choose with `-p` where each port is reachable.
+Inside the container both listeners bind every interface (`WKD_ADDR=:8080`, `DASHBOARD_ADDR=:8081`); choose with `-p` where each port is reachable. The database lives at `/var/lib/matcha/matcha.db` on the image's volume; keep that volume across upgrades.
+
+## WKD
+
+The WKD listener serves the direct method: `GET` and `HEAD` on `/.well-known/openpgpkey/hu/<hash>` and `GET /.well-known/openpgpkey/policy`. The nginx in front of the mail domain must proxy the whole `/.well-known/openpgpkey/` prefix to it, ahead of any redirect. Each served key keeps all of its User IDs but none of the certifications made by other keys.
 
 ## License
 
