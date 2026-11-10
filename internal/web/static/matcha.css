@@ -642,7 +642,11 @@ textarea:focus-visible {
 
 /* Tables */
 
+/* Positioned, so that the .sr-only label of the actions column, which
+   is absolutely positioned, scrolls with the table instead of widening
+   the page when the table is wider than the screen. */
 .tbl-wrap {
+	position: relative;
 	margin: 0 0 var(--block-gap);
 	overflow-x: auto;
 	border: 1px solid var(--border);
