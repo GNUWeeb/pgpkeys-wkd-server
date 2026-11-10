@@ -2,118 +2,73 @@
 
 ## Project Overview
 
-`pgpkeys-wkd-server` is a small HTTP server that serves GNUWeeb members' OpenPGP public keys via Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works. Keys are not stored locally: they are pulled from the GitHub repo `GNUWeeb/pgpkeys` (`map.txt` + `keys/<FINGERPRINT>.asc`) into memory and refreshed by a GitHub push webhook. License: GPL-2.0.
+`matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and will give members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: legacy code, rewrite planned.** The Node implementation described below is to be replaced by a Go rewrite named `matcha`. `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction. Until the rewrite lands, the sections below describe the code as it is today:
+**Status: rewrite in progress.** The Node service was removed; the Go rewrite is built phase by phase following `ROADMAP.md`, which holds the plan and the settled decisions. Read it before any feature work and treat it as the authority on direction.
 
-- Do not add features to the Node code or migrate its tooling; changes to `src/` are limited to what the user explicitly asks for.
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
 
 ## Architecture & Data Flow
 
-Single process, no database, no disk state. All state is one in-memory map.
+One process, two HTTP listeners, no state yet:
 
 ```
-index.ts -> Server.start() -> WKDEntryManager.loadKeys(true) -> register @fastify/compress -> registerRoutes() -> listen
+cmd/matcha/main.go: config.Load(os.Getenv) -> one http.Server per listener -> serve() until SIGINT/SIGTERM -> graceful Shutdown
 ```
 
-**Key load** (`WKDEntryManager.loadKeys(force, commitHash?)`):
+- **WKD listener** (`WKD_ADDR`): will serve `/.well-known/openpgpkey/...`; only the nginx in front of `gnuweeb.org` is meant to reach it. Today it answers 404 to everything.
+- **Dashboard listener** (`DASHBOARD_ADDR`): will serve `pgp.gnuweeb.org`. Today it answers 404 to everything.
 
-1. Resolve the commit SHA: `api.github.com/repos/<REPOSITORY>/branches/<BRANCH>` (unauthenticated), unless the webhook passed one.
-2. Fetch `raw.githubusercontent.com/<REPOSITORY>/<sha>/map.txt`, parse with `mapItemRegex` (`U: <uid>` / `W: <wkdHash>` / `P: <file>` lines), keep only UIDs matching `emailRegex` (`@<EMAIL_DOMAIN>`).
-3. Fetch each `keys/<file>` (sends `If-None-Match` with the stored ETag unless `force`), parse with `openpgp.readKey`.
-4. Store as `Map<wkdHash, PubKeySet>`; `PubKeySet` is a `Set<{ data: PublicKey, etag }>`.
-
-The server never computes WKD hashes; it trusts the `W:` values in `map.txt`.
-
-**Routes** (all in `src/server.ts`, all under `/.well-known/openpgpkey`):
-
-| Method | Path | Behavior |
-| --- | --- | --- |
-| GET | `/policy` | Empty body (WKD Update Protocol is not implemented) |
-| HEAD | `/hu/:wkdHash` | 200 or 404 |
-| GET | `/hu/:wkdHash` | `application/octet-stream`, all keys of the entry concatenated newest-first, `X-Fingerprints` header; 404 on miss |
-| POST | `/internal/updateHook` | GitHub push webhook (`src/lib/util/updateHook.ts`) |
-
-**Webhook flow**: validate headers (`content-type` exactly `application/json`, `x-github-event: push`, delivery ID, `x-hub-signature-256`) -> HMAC-SHA256 over `JSON.stringify(body)` with `WEBHOOK_SECRET` -> check `ref` is `refs/heads/<BRANCH>` -> if any commit modified `map.txt`, full `loadKeys(false, body.after)`; otherwise per-key remove/modify for changed `keys/*` files. Response is `{ ok, actions: [...] }` or `{ ok: false, error }` with 400/401.
-
-**Known defects (do not rely on this behavior; fix only when asked, since this code is slated for removal):**
-
-- `WKDEntryManager.updatePubKey` re-adds `oldPubKey` instead of `newPubKey`, so a "modify" webhook reports the new key but the store keeps the old one.
-- `loadKeys` only adds/replaces entries; entries removed from `map.txt` stay in memory until restart.
-- `mapItemRegex` is a module-level `/g` regex; a throw inside the `exec` loop leaves a stale `lastIndex`.
-- `emailRegex` interpolates `EMAIL_DOMAIN` unescaped.
-- Signature comparison uses `===`, not `crypto.timingSafeEqual`, and hashes re-serialized JSON rather than the raw body.
-- One unparsable key file or a `map.txt` entry without `P:` lines rejects the whole load.
+`serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
 
 ## Key Directories
 
-- `src/` - all source. `src/lib/` holds the domain classes, `src/lib/util/` holds stateless helper functions.
-- `dist/` - `tsc` output, gitignored, required by `pnpm start`.
-- `.github/workflows/` - CI (lint + compile) and release image build.
+- `cmd/matcha/` - the binary: wiring, signal handling, server lifecycle.
+- `internal/config/` - settings from the environment.
 
-There is no `scripts/`, `docs/` or test directory (`eslintConfig.ignorePatterns` mentions `scripts/*`, which does not exist).
+There is no `scripts/` or `docs/` directory.
 
 ## Development Commands
 
 ```bash
-pnpm install            # install dependencies
-pnpm run lint           # eslint . --ignore-path .gitignore --ext .ts
-pnpm run lint:fix       # same, with --fix
-pnpm run compile        # tsc --build tsconfig.json -> dist/ (also the only typecheck)
-pnpm run build          # lint && compile (what Docker and CI rely on)
-pnpm run start:dev      # compile && start
-pnpm start              # node dist/index.js (needs a prior compile)
+go build -o matcha ./cmd/matcha   # build the binary (gitignored)
+go vet ./... && go test ./...     # the gate
+go run ./cmd/matcha               # run with settings from the environment
+docker build -t matcha .          # image; podman build works the same
 ```
 
-Running needs a `.env` (copy `.env.example`). `WEBHOOK_SECRET` is mandatory: `src/constants.ts` throws at import time without it. Startup performs live requests to GitHub, so it needs network access.
-
-Docker: `docker run -d -p 3000:3000 --env-file .env ghcr.io/gnuweeb/pgpkeys-wkd-server:latest`. The final stage copies from `/tmp/build`, which the `Dockerfile` never sets; it depends on the `ghcr.io/hazmi35/node` base image's working directory.
+Configuration is read from the environment only; the binary does not read `.env`. For a local run: `set -a; . ./.env; set +a; go run ./cmd/matcha`. Docker: `docker run --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 matcha`.
 
 ## Code Conventions & Common Patterns
 
-- **Formatting**: 4-space indent, double quotes, semicolons, no trailing commas, lines up to ~120 columns. Style is enforced only by ESLint (`@hazmi35/eslint-config/typescript`, configured inline in `package.json`); there is no Prettier or EditorConfig.
-- **Modules**: ESM (`"type": "module"`, `module: Node16`). Relative imports MUST carry the `.js` extension: `import { Server } from "./server.js";`. No path aliases, no JSON imports (`resolveJsonModule: false`).
-- **Naming**: class files PascalCase (`WKDEntryManager.ts`, `PubKeySet.ts`); function/util files camelCase, one exported function per file named like the file (`fetchContent.ts`, `verifySignature.ts`). Constants camelCase.
-- **Class style**: explicit `public`/`private` modifiers and explicit return types on every method; short accessors written on one line. Domain containers extend built-ins (`WKDEntryManager extends Map`, `PubKeySet extends Set`) rather than wrapping them.
-- **State**: the only mutable state is `Server.wkd`. Utilities receive it as a parameter (`updateHook(req, res, wkd)`); there is no DI container and no global singleton.
-- **Config**: read `process.env` only in `src/constants.ts` (which also loads `dotenv/config`) and import the named constants elsewhere. Shared regexes live there too.
-- **Errors**: library code throws plain `Error` with a descriptive message; there is no `try/catch` in `src/`. Route handlers return early with `res.status(n).send({ ok: false, error })`. `fetchContent` returns `null` for anything but 200/304. Uncaught exceptions and unhandled rejections are logged and exit the process (`src/index.ts`).
-- **Async**: `async/await`; `Promise.all` for parallel key fetches; no timeouts or retries on `fetch`.
-- **Logging**: Fastify's pino logger only (`server.fastify.log`, `req.log`); no `console.*`.
-- **Lint suppressions**: narrow, single-line, with a reason (`// @ts-expect-error False positive ...`, `// eslint-disable-next-line <rule>`).
-- **TypeScript**: `strict: true`, target ES2022. `importHelpers` + `noEmitHelpers` are on while `tslib` is not a runtime dependency, so avoid syntax that needs emit helpers (e.g. decorators).
+- **Formatting**: `gofmt`. Doc comments on every package and exported identifier.
+- **Layout**: `cmd/matcha` for the binary, everything else under `internal/`, one package per concern. No global state; dependencies are passed explicitly (constructor arguments or struct fields).
+- **Config**: read the environment only in `internal/config` (`config.Load(getenv)`, which takes the lookup function so tests pass a map). Other packages receive values, not `os.Getenv`.
+- **Errors**: return errors wrapped with context (`fmt.Errorf("WKD_ADDR: %w", err)`); `main` logs and exits non-zero. No panics for expected failures.
+- **Logging**: `log/slog` only, created in `main` and passed down. Never log secrets, tokens or cookies.
+- **HTTP**: `net/http` servers with explicit timeouts (`newServer` in `cmd/matcha/main.go`).
 
 ## Important Files
 
 - `ROADMAP.md` - plan for the rewrite: goal, decisions, kernel.org reference model, WKD behaviour, phases, open items.
-- `src/index.ts` - entry point: process signal/exception handlers, `server.start(port, host)`.
-- `src/server.ts` - `Server` class: Fastify instance, route registration, start/close.
-- `src/constants.ts` - environment config and `map.txt` regexes.
-- `src/lib/WKDEntryManager.ts` - key store, `map.txt` parsing, GitHub URL builders.
-- `src/lib/PubKeySet.ts` - per-entry key set, `combineBinary()` builds the response body.
-- `src/lib/util/updateHook.ts` - webhook handler; `verifySignature.ts`, `fetchContent.ts` - helpers.
-- `.env.example` - `PORT`, `HOST`, `REPOSITORY`, `BRANCH`, `EMAIL_DOMAIN`, `WEBHOOK_SECRET` (defaults for all but the last are in `src/constants.ts`).
-- `package.json` - scripts and inline `eslintConfig`. `tsconfig.json` is JSONC (contains comments).
-- `Dockerfile`, `.github/workflows/lint-compile.yml`, `.github/workflows/build-release.yml`.
-
-`README.md` gives the webhook path as `/internal/updateHook`; the real route is `/.well-known/openpgpkey/internal/updateHook` (the README assumes a reverse proxy mapping that prefix).
+- `cmd/matcha/main.go` - entry point, listeners, graceful shutdown.
+- `internal/config/config.go` - every environment variable and its default.
+- `.env.example` - documented settings; copy to `.env` (gitignored).
+- `Dockerfile` - Go build stage, Debian slim runtime, static binary, non-root user; base images pinned by digest.
 
 ## Runtime/Tooling Preferences
 
-- Node.js 18+ (README; Docker uses a floating `lts` image, typings are `@types/node` 20). Not Bun or Deno.
-- pnpm 8 only (`pnpm-lock.yaml`, lockfile v6). Newer pnpm refuses the lockfile (`ERR_PNPM_BROKEN_LOCKFILE` with pnpm 12); when the installed pnpm is newer, run pnpm 8 through npx: `npx -y pnpm@8.15.9 install --frozen-lockfile`, then `npx -y pnpm@8.15.9 run build`. Do not regenerate the lockfile, and do not add `package-lock.json` or `yarn.lock`. No `engines` or `packageManager` field enforces this.
-- Stack: `fastify` 4, `@fastify/compress`, `openpgp` 5, `node-fetch` 3, `dotenv`. Prefer these over adding dependencies.
+- Go 1.27 (`go.mod`); module path `git.gnuweeb.net/GNUWeeb/matcha`. `CGO_ENABLED=0` builds must keep working, so no cgo dependencies.
+- Prefer the standard library; the dependencies decided in `ROADMAP.md` (`ProtonMail/go-crypto`, templ, chi, htmx, a pure-Go SQLite driver) come in with the phase that needs them.
 - Default branch `master`; release tags are bare semver (`1.0.1`).
-- Hosting: `origin` is `git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server` (GitLab). There is no `.gitlab-ci.yml`. The GitHub workflows in `.github/` and the `ghcr.io` image they publish on a GitHub release are leftovers from GitHub hosting, and `README.md` still gives the GitHub clone URL.
+- Hosting: `origin` is `git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server` (GitLab; renaming the project to `matcha` waits on the owner). There is no CI: no `.gitlab-ci.yml`, and the GitHub workflows were deleted.
 
 ## Testing & QA
 
-- There are no tests, no test framework and no coverage target. Do not claim tests were run.
-- The verification gate is `pnpm run build` (lint + typecheck); it must pass before a change is done. Run it locally: no CI runs on GitLab. (`lint-compile.yml` delegates to the external reusable workflow `Hazmi35/workflows/.github/workflows/pnpm-eslint-typescript.yml@master` and only ever ran on GitHub.)
-- For behavior changes, smoke-test manually: `pnpm run start:dev`, then `curl -i localhost:3000/.well-known/openpgpkey/hu/<wkdHash>` (take a `W:` value from `map.txt` in `GNUWeeb/pgpkeys`) and `curl -i localhost:3000/.well-known/openpgpkey/policy`.
-- If tests are added, mock GitHub (`fetch`) rather than hitting the network, and bind to loopback on port 0.
+- The verification gate is `go vet ./... && go test ./...`; it must pass before a change is done. Run it locally: no CI runs on GitLab.
+- Tests are standard `go test` tests next to the code. HTTP tests use `net/http/httptest`; anything that listens binds to loopback on port 0.
+- For behaviour changes, also smoke-test the running binary with `curl` against both listeners.
 
 ## Git Commit Rules
 
@@ -121,9 +76,9 @@ Apply to every commit.
 
 ### Scope and timing
 
-- Atomic commits: one self-contained logical change each. No commit may leave the tree known-broken (`pnpm run build` passes at every commit), so `git bisect` stays usable.
+- Atomic commits: one self-contained logical change each. No commit may leave the tree known-broken (`go vet ./... && go test ./...` passes at every commit), so `git bisect` stays usable.
 - Commit as soon as a logical unit builds. Uncommitted changes in the working tree must only ever belong to the next single commit. Refactoring, implementation and docs for one feature are separate commits, made in turn.
-- Gate every commit on the build result with `&&` or `if`, never `;`: `pnpm run build && git commit -s ...`.
+- Gate every commit on the build result with `&&` or `if`, never `;`: `go vet ./... && go test ./... && git commit -s ...`.
 
 ### Message format
 
@@ -191,7 +146,7 @@ When merging a topic branch into `master`, always create a merge commit (`--no-f
 
 ```
 git merge --no-ff --log --signoff --no-commit -F /dev/null <branch>
-# resolve conflicts, if any; then: pnpm run build
+# resolve conflicts, if any; then: go vet ./... && go test ./...
 # write parts 1-6 of the layout below to <head-file>, then:
 cat <head-file> "$(git rev-parse --git-path MERGE_MSG)" > <message-file>
 git commit -s --cleanup=strip -F <message-file>
@@ -225,9 +180,9 @@ in-memory store follow the repository:
   - A modified key file replaces the stored key instead of re-adding
     the old one (a fix).
 
-The merged tree passes "pnpm run build", and a local instance served
-the expected keys after replaying push webhooks for a removed entry
-and a modified key.
+The merged tree passes "go vet ./..." and "go test ./...", and a
+local instance served the expected keys after replaying push webhooks
+for a removed entry and a modified key.
 
 * reload_fixes:
   fix(wkd): store the new key when a key file is modified
@@ -252,7 +207,7 @@ After committing, recheck as for any commit, plus: the layout above, exactly one
 - Each writing agent gets its own git worktree and branch, created in advance. Read-only agents (research, review) may share the main checkout.
 - Sub agents never modify, build in, check out or commit in the main checkout or another agent's worktree; never push; never rebase onto or modify `master`.
 - Never use `git stash` (shared by all worktrees). Keep work in progress as commits on the agent's own branch or as patch files in its scratch directory.
-- Servers started for checks bind to loopback only, on port 0 or a random high port (`HOST=127.0.0.1 PORT=<port>`), because other agents may run at the same time.
+- Servers started for checks bind to loopback only, on port 0 or a random high port (`WKD_ADDR=127.0.0.1:<port> DASHBOARD_ADDR=127.0.0.1:<port>`), because other agents may run at the same time.
 - Stop every process you started, by PID. Never wait on a name pattern (`pgrep -f`, `ps | grep`); poll with `kill -0 "$pid"`.
 - No sudo unless the user has permitted it.
 - A sub agent's final reply lists its commits, what is done / partly done / deferred and why, what was built and run, and anything it was unsure of. The coordinator treats that as a claim, not proof: review the commits and rebuild before merging, then remove the worktree and branch (`git worktree remove`, `git branch -d`; never force).

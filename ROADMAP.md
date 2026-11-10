@@ -1,6 +1,6 @@
 # Roadmap
 
-Plan for turning `pgpkeys-wkd-server` from a read-only mirror of the `GNUWeeb/pgpkeys` repository into a self-service key directory modelled on kernel.org's key infrastructure. Nothing here is implemented yet. Facts marked "observed" were checked on 2026-11-10; items marked "unverified" must be checked in the phase that needs them.
+Plan for turning `pgpkeys-wkd-server` from a read-only mirror of the `GNUWeeb/pgpkeys` repository into a self-service key directory modelled on kernel.org's key infrastructure. Each phase below states whether it is done. Facts marked "observed" were checked on 2026-11-10; items marked "unverified" must be checked in the phase that needs them.
 
 ## Goal
 
@@ -43,14 +43,17 @@ Settled by the maintainer on 2026-11-11:
 | Language | Go, with `github.com/ProtonMail/go-crypto` for OpenPGP and templ, chi and htmx for the dashboard (greentea's stack). Bun and Rust with Sequoia were considered and dropped. |
 | Storage | SQLite: one file, no extra service. |
 | Key-health checker | `sq` (Sequoia) run as a subprocess, as kernel.org's scripts do. Debian 13 packages `sq` 1.3.1. |
+| Go module path | `git.gnuweeb.net/GNUWeeb/matcha`, the URL the project gets once renamed. |
+| Listeners | Two addresses: `WKD_ADDR` for the WKD routes, reachable only by the `gnuweeb.org` nginx, and `DASHBOARD_ADDR` for `pgp.gnuweeb.org`. Dashboard routes do not exist on the WKD listener and the reverse. |
+| Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
 
 ## Where We Are (observed)
 
-- Node 18+/pnpm/Fastify 4 service; keys are fetched from GitHub (`GNUWeeb/pgpkeys`: `map.txt` + `keys/*.asc`) into memory and refreshed by a GitHub push webhook. No tests, no database. Details and known defects are in `AGENTS.md`.
+- Phase 1 replaced the Node service (which mirrored `GNUWeeb/pgpkeys` from GitHub into memory) with a Go skeleton; see `AGENTS.md` for the current state.
 - WKD for `gnuweeb.org` is not being served: `https://gnuweeb.org/.well-known/openpgpkey/policy` answers 302 to `https://www.gnuweeb.org/...`, which answers 404.
 - `openpgpkey.gnuweeb.org` and `pgp.gnuweeb.org` do not resolve.
 - `GNUWeeb/pgpkeys` also exists on `git.gnuweeb.net` (imported 2026-06-16). It holds `keys/<FINGERPRINT>.asc`, a generated `map.txt` and `genmap.py`; members add keys by pull request.
-- CI and image publishing exist only as GitHub workflows (`.github/workflows/`); there is no `.gitlab-ci.yml`.
+- The GitHub workflows were deleted in phase 1; there is no `.gitlab-ci.yml`.
 
 ## Reference Model: kernel.org (observed)
 
@@ -85,7 +88,7 @@ Settled by the maintainer on 2026-11-11:
 
 The specification is the Internet-Draft `draft-koch-openpgp-webkey-service` (revision 22, 2026-07-22, individual draft, expires 2027-01-23). It is not an RFC and can still change. Target: key discovery (section 3.1) with the direct method, served the way kernel.org serves it.
 
-| Behaviour | Today | Planned |
+| Behaviour | Node service (removed in phase 1) | Planned |
 | --- | --- | --- |
 | `GET .../hu/<hash>` returns the binary keys for the address, concatenated, newest first | yes | keep |
 | `HEAD` on the same URL | yes | keep |
@@ -125,7 +128,7 @@ Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 8 are not to 
 ### 1. Tooling and rename
 
 - Start a Go module named `matcha`; the service is rewritten, not ported.
-- Remove the Node toolchain: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `src/` (once phase 2 replaces what it does).
+- Remove the Node toolchain: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `src/`. Done together, rather than keeping `src/` until phase 2: production does not route WKD to the Node service, and the sources cannot build without the toolchain.
 - Apply the new name: module, binary and image name, `README.md`, `AGENTS.md`.
 - Rewrite the `Dockerfile` as decided above: Go build stage, Debian runtime stage, static binary.
 - Delete `.github/`.
@@ -133,12 +136,14 @@ Current scope (maintainer, 2026-11-11): phases 1 to 5. Phases 6 to 8 are not to 
 
 Done when: the image builds with `docker build .` and the container starts.
 
+Status: done 2026-11-11. The image was built with `podman build .` (the Docker daemon was not running on the build machine; the Dockerfile uses nothing Podman-specific) and the container answered on both ports as uid 10001.
+
 ### 2. Key store and WKD
 
 - Storage layer for keys, indexed by address and WKD hash; several keys per address.
 - Upload-time checks: public key material only, a User ID with the member's address, a size cap.
 - WKD routes served from the store as in the table above.
-- Remove the `pgpkeys` sync and the webhook.
+- Remove the `pgpkeys` sync and the webhook (done in phase 1 with the Node sources).
 - First automated tests: the draft's hash vector, the WKD view (no third-party certifications), several keys for one address, `GET`/`HEAD`/404, policy.
 
 Done when: `gpg --auto-key-locate wkd --locate-keys` against a local instance returns the key, with a fresh `GNUPGHOME`.

@@ -1,47 +1,58 @@
-# pgpkeys-wkd-server
+# matcha
 
-A Simple HTTP Server to serve GNUWeeb's [pgpkeys](https://github.com/GNUWeeb/pgpkeys) via [Web Key Directory](https://datatracker.ietf.org/doc/html/draft-koch-openpgp-webkey-service)
+GNUWeeb's OpenPGP key directory. It serves members' public keys through [Web Key Directory](https://datatracker.ietf.org/doc/draft-koch-openpgp-webkey-service/) (WKD) and gives members a dashboard where they manage their own keys.
+
+This is a rewrite in progress (formerly `pgpkeys-wkd-server`); see [ROADMAP.md](ROADMAP.md) for the plan.
 
 ## End-user usage
-Any OpenPGP client that supports WKD can use this server to fetch GNUWeeb's public key.
 
-For example on gnupg v2.1.23 or above:
+Any OpenPGP client that supports WKD can fetch a member's key, for example GnuPG 2.1.23 or later:
+
 ```bash
-$ gpg --locate-key hzmi@gnuweeb.org
+gpg --locate-key hzmi@gnuweeb.org
 ```
 
-See the [FAQ / WIKI](https://gnupg.org/faq/wkd.html) for more information.
+See the [GnuPG WKD page](https://gnupg.org/faq/wkd.html) for more information.
 
 ## Server usage
-### Requirements
-- Node.js v18.0.0 or above
-- pnpm v8.0.0 or above
-### Installation
-```bash
-$ git clone https://github.com/GNUWeeb/pgpkeys-wkd-server.git
-$ cd pgpkeys-wkd-server
-$ pnpm install
-```
-### Configuration
-Copy .env.example to .env and fill/edit the values
 
-For GitHub webhook use `application/json` and make sure to set the secret in the GitHub webhook settings and in the .env file.
-Use `/internal/updateHook` (see notes for details for full path) as a path. This only needs the push event.
+### Requirements
+
+- Go 1.27 or later, or Docker (or Podman).
+
+### Building
+
+```bash
+git clone https://git.gnuweeb.net/GNUWeeb/pgpkeys-wkd-server.git
+cd pgpkeys-wkd-server
+go build -o matcha ./cmd/matcha
+```
+
+### Configuration
+
+matcha reads its settings from the environment. `.env.example` lists them with their defaults; copy it to `.env` and edit it.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `WKD_ADDR` | `127.0.0.1:8080` | Listen address of the WKD routes |
+| `DASHBOARD_ADDR` | `127.0.0.1:8081` | Listen address of the dashboard |
 
 ### Running
+
 ```bash
-$ pnpm start
+set -a; . ./.env; set +a
+./matcha
 ```
-OR use any other process manager.
 
 ### Docker
-You could use Docker and skip installing Node.js and pnpm and cloning the repo.
+
 ```bash
-$ docker run -d -p 3000:3000 --env-file .env --name pgpkeys-wkd-server ghcr.io/gnuweeb/pgpkeys-wkd-server:latest
+docker build -t matcha .
+docker run -d --env-file .env -p 127.0.0.1:8080:8080 -p 127.0.0.1:8081:8081 --name matcha matcha
 ```
-OR you can use docker compose yourself.
 
-### Notes
-Make sure to map a URL prefix in `https://<EMAIL_DOMAIN>/.well-known/openpgpkey` to the server (resulting path: `https://<EMAIL_DOMAIN>/.well-known/openpgpkey/hu/<wkd hash>`).
+Inside the container both listeners bind every interface (`WKD_ADDR=:8080`, `DASHBOARD_ADDR=:8081`); choose with `-p` where each port is reachable.
 
-For Docker, you can use something like [watchtower](https://github.com/containrrr/watchtower) to keep the server up to date.
+## License
+
+GPL-2.0, see [LICENSE](LICENSE).
