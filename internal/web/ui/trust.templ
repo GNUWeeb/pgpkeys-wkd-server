@@ -40,6 +40,9 @@ type TrustView struct {
 	In, Out       []TrustLink
 	Others        int
 	Waiting, Sent []CertRequest
+	// Root is the member's chain from the root key, nil when no root key
+	// is set.
+	Root *RootPath
 }
 
 // Trust shows the members linked to the member by certifications and the
@@ -56,6 +59,9 @@ templ Trust(p Page, v TrustView, f Flash) {
 				<h2 id="trust-waiting">Waiting for your approval</h2>
 				@requestTable(p, v.Waiting, "Certifying key", true)
 			</section>
+		}
+		if v.Root != nil {
+			@rootPath(v.Root)
 		}
 		<section class="trust" aria-labelledby="trust-in">
 			<h2 id="trust-in">Certified your keys</h2>

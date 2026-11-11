@@ -86,6 +86,14 @@ func (s *Server) trust(w http.ResponseWriter, r *http.Request) {
 		Out:    s.trustLinks(out, addresses),
 		Others: others,
 	}
+	fprs := make([]string, 0, len(own))
+	for _, k := range own {
+		fprs = append(fprs, k.Fingerprint)
+	}
+	if v.Root, err = s.rootPathOf(r.Context(), fprs); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	for _, c := range waiting {
 		v.Waiting = append(v.Waiting, ui.CertRequest{ID: c.ID, Members: s.memberAddresses([]string{c.SubmittedBy}),
 			Fingerprint: c.Signer, UserID: c.UserID, Created: c.Created})

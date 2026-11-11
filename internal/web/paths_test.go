@@ -101,6 +101,9 @@ func TestRootPaths(t *testing.T) {
 	if bands := []int{strings.Index(graph, ">Root key<"), strings.Index(graph, ">1 step<"), strings.Index(graph, ">2 steps<"), strings.Index(graph, ">No path from root key<")}; !slices.IsSorted(bands) || bands[0] < 0 {
 		t.Errorf("graph bands out of order: %v", bands)
 	}
+	if _, body := h.get(c, "/trust"); !strings.Contains(body, `class="path"`) || !strings.Contains(body, `href="/members/root@gnuweeb.org"`) {
+		t.Error("bob's web of trust page does not show his path from the root key")
+	}
 	if _, body := h.get(c, "/members/dave@gnuweeb.org"); !strings.Contains(body, "No path from the root key.") {
 		t.Error("dave's page does not say no path leads to him")
 	}
