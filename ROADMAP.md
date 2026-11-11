@@ -48,7 +48,7 @@ Settled by the maintainer on 2026-11-11:
 | Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
 | DSA keys | Refused, although `sq` 1.3.1 accepts DSA-2048 (confirmed 2026-11-11 after phase 6 found the difference). |
 | Revoked keys in the export | Kept in `keys/`, so importing the keyring spreads the revocation; kernel.org removes them by hand instead (confirmed 2026-11-11). |
-| Web of trust page | Each member sees their direct links: who certified their keys and whose keys they certified. Their chain from the root key shows on their member page and, highlighted, in the graph (decided 2026-11-11). |
+| Web of trust page | Each member sees their direct links: who certified their keys and whose keys they certified, and their chain from the root key as a line of names; the chain also shows on member pages and, highlighted, in the graph (decided 2026-11-11). |
 | Submitting certifications | The certifier submits the certified key in the dashboard; only certifications by the certifier's own stored keys on the key's existing User IDs are taken, and they are added only after the key's owner accepts them (decided 2026-11-11). kernel.org has no such path: certifications reach its keyring only in the owner's own export, added by hand. |
 | Member pages | Every member named in the dashboard links to a page with their name, photo and keys as WKD serves them, and a download, plus their chain from the root key when one is set. The key list no longer names certifiers per User ID (decided 2026-11-11). |
 | Members list and graph | Every logged-in member sees every member who has keys, and a graph of every certification between members, banded by steps from the root key (decided 2026-11-11, after members asked for both; it replaces "never the whole directory" and "no graph"). The addresses are those WKD answers for anyway, and the old `GNUWeeb/pgpkeys` repository listed them in public. |
@@ -232,7 +232,7 @@ Changed 2026-11-11, after members asked in the group chat: a "Members" page list
 
 Changed 2026-11-11, after the maintainer's review: the optional graph is built after all, on the members page, as SVG drawn by the server (no script). It replaces the list's column of steps from the root key. The dashboard's pages also lost most of their explanatory sentences; the gpg commands stay, each with a few words on what it is for. Checked in a browser in light and dark: the stand-in root key on top, the bands below it, arrows that skip a band routed along the left of the boxes.
 
-Changed 2026-11-11, after the maintainer's review: the chain from the root key left the web of trust page and shows on member pages as one line of names; the graph highlights the viewer's own chain; "Not connected" became "No path from root key", since it means only that no chain of certifications leads there, at any length.
+Changed 2026-11-11, after the maintainer's review: the chain from the root key shows as one line of names, on member pages and on the member's own web of trust page; the graph highlights the viewer's own chain; "Not connected" became "No path from root key", since it means only that no chain of certifications leads there, at any length.
 
 ## Design Reference: greentea (observed)
 
