@@ -26,10 +26,11 @@ const (
 // layoutGraph draws the members (rows, sorted by name) and who certified
 // whom (links, by address, from certifier to certified). With a root key,
 // members sit in bands by their steps from it, the root key's holder on
-// top and those not connected at the bottom, so that most links point
-// down; without one, all sit in one band. A band wraps after graphPerRow
-// members.
-func layoutGraph(rows []ui.MemberRow, links [][2]string) ui.Graph {
+// top and those it does not reach at the bottom, so that most links
+// point down; without one, all sit in one band. A band wraps after
+// graphPerRow members. mine, the addresses on the viewer's own chain from
+// the root key, is highlighted.
+func layoutGraph(rows []ui.MemberRow, links [][2]string, mine []string) ui.Graph {
 	if len(rows) == 0 {
 		return ui.Graph{}
 	}
@@ -70,7 +71,7 @@ func layoutGraph(rows []ui.MemberRow, links [][2]string) ui.Graph {
 	for _, b := range bands {
 		members := bandOf[b]
 		if withRoot {
-			label := "Not connected"
+			label := "No path from root key"
 			switch {
 			case b == 0:
 				label = "Root key"
@@ -89,7 +90,7 @@ func layoutGraph(rows []ui.MemberRow, links [][2]string) ui.Graph {
 				g.Nodes = append(g.Nodes, ui.GraphNode{
 					X: left + j*(graphNodeW+graphGapX), Y: y,
 					Name: shorten(m.Name, graphNameMax), Address: shorten(m.Address, graphAddrMax), URL: m.URL,
-					Root: withRoot && b == 0, Unconnected: withRoot && b < 0,
+					Root: withRoot && b == 0, Unconnected: withRoot && b < 0, Mine: slices.Contains(mine, m.Address),
 				})
 			}
 			y += graphNodeH + graphGapY
@@ -102,6 +103,18 @@ func layoutGraph(rows []ui.MemberRow, links [][2]string) ui.Graph {
 	slices.SortFunc(links, func(a, b [2]string) int {
 		return cmp.Or(cmp.Compare(a[0], b[0]), cmp.Compare(a[1], b[1]))
 	})
+	onPath := func(l [2]string) bool {
+		for i := 1; i < len(mine); i++ {
+			if mine[i-1] == l[0] && mine[i] == l[1] {
+				return true
+			}
+		}
+		return false
+	}
+	// Arrows on the viewer's chain come last, drawn over the others.
+	slices.SortStableFunc(links, func(a, b [2]string) int {
+		return cmp.Compare(btoi(onPath(a)), btoi(onPath(b)))
+	})
 	for _, l := range links {
 		from, ok1 := at[l[0]]
 		to, ok2 := at[l[1]]
@@ -111,9 +124,17 @@ func layoutGraph(rows []ui.MemberRow, links [][2]string) ui.Graph {
 		g.Edges = append(g.Edges, ui.GraphEdge{
 			D:     edgePath(g.Nodes[from], g.Nodes[to]),
 			Title: l[0] + " certified " + l[1],
+			Mine:  onPath(l),
 		})
 	}
 	return g
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // edgePath is the SVG path of an arrow from node a to node b: from a's
