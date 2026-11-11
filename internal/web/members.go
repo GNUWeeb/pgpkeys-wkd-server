@@ -49,7 +49,7 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.now()
-	v := ui.MemberView{Address: addr, Self: addr == sessionAddress(r), Download: memberURL(addr) + "/keys.asc", Photo: s.photoURL(addr)}
+	v := ui.MemberView{Address: addr, Download: memberURL(addr) + "/keys.asc", Photo: s.photoURL(addr)}
 	fprs := make([]string, 0, len(stored))
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
@@ -89,12 +89,13 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.now()
-	paths, err := s.rootPaths(all, now)
+	signers, addresses := signersOf(all)
+	certified, err := certEdges(signers, now)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
 	}
-	_, addresses := signersOf(all)
+	paths := s.rootPaths(signers, certified)
 	byAddress := map[string][]keys.Info{}
 	var order []string
 	for _, k := range all {
@@ -127,9 +128,23 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 	slices.SortStableFunc(rows, func(a, b ui.MemberRow) int {
 		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Address, b.Address))
 	})
+	// Who certified whom, by address: a member's keys certifying each
+	// other is no link.
+	var links [][2]string
+	for from, tos := range certified {
+		for _, to := range tos {
+			for _, a := range addresses[from] {
+				for _, b := range addresses[to] {
+					if a != b && !slices.Contains(links, [2]string{a, b}) {
+						links = append(links, [2]string{a, b})
+					}
+				}
+			}
+		}
+	}
 	p := s.page(r, "Members")
 	p.Nav = "/members"
-	s.render(w, r, http.StatusOK, ui.Members(p, rows, s.opts.RootKey != ""))
+	s.render(w, r, http.StatusOK, ui.Members(p, rows, layoutGraph(rows, links)))
 }
 
 // blankPNG is a transparent pixel: the photo of a member who has none,

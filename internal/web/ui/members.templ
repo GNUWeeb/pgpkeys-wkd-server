@@ -17,8 +17,6 @@ type MemberView struct {
 	// Photo, when set, serves the member's photo, a transparent pixel
 	// where they have none.
 	Photo string
-	// Self is set when members look at their own page.
-	Self bool
 	Keys []keys.Info
 	// Download serves the keys, armored.
 	Download string
@@ -49,35 +47,30 @@ type MemberRow struct {
 	URL      string
 	// Keys counts the keys stored for the address.
 	Keys int
-	// Root is their chain from the root key, nil when no root key is set.
+	// Root is their chain from the root key, nil when no root key is set;
+	// it places them in the graph.
 	Root *RootPath
 }
 
-// Members lists the members who have keys in the directory, with how far
-// each is from the root key when one is set (withRoot).
-templ Members(p Page, rows []MemberRow, withRoot bool) {
+// Members lists the members who have keys in the directory under a graph
+// of who certified whom.
+templ Members(p Page, rows []MemberRow, g Graph) {
 	@Layout(p) {
 		<header class="page-head">
-			<div>
-				<h1>Members</h1>
-				<p class="muted">Everyone whose keys Web Key Directory serves. Open a member for their keys.</p>
-			</div>
+			<h1>Members</h1>
 		</header>
 		if len(rows) == 0 {
 			<div class="empty">
 				<p class="empty-title">No members yet</p>
-				<p>Members appear here once they add a key.</p>
 			</div>
 		} else {
+			@graph(g)
 			<div class="tbl-wrap">
 				<table class="tbl">
 					<thead>
 						<tr>
 							<th scope="col">Member</th>
 							<th scope="col">Keys</th>
-							if withRoot {
-								<th scope="col">Root key</th>
-							}
 						</tr>
 					</thead>
 					<tbody>
@@ -93,11 +86,6 @@ templ Members(p Page, rows []MemberRow, withRoot bool) {
 									</a>
 								</td>
 								<td>{ strconv.Itoa(m.Keys) }</td>
-								if withRoot {
-									<td>
-										@rootDistance(m.Root)
-									</td>
-								}
 							</tr>
 						}
 					</tbody>
@@ -107,46 +95,85 @@ templ Members(p Page, rows []MemberRow, withRoot bool) {
 	}
 }
 
-// rootDistance says how many certifications away from the root key a
-// member is.
-templ rootDistance(r *RootPath) {
-	switch {
-		case r == nil || len(r.Steps) == 0:
-			<span class="badge">Not connected</span>
-		case len(r.Steps) == 1:
-			<span class="badge ok">Root key</span>
-		case len(r.Steps) == 2:
-			<span class="badge ok">Certified by it</span>
-		default:
-			<span class="badge ok">{ strconv.Itoa(len(r.Steps) - 1) } steps</span>
-	}
+// Graph is the web of trust drawn: members as boxes, certifications as
+// arrows from the certifier, and, with a root key, labels for the bands
+// of members by their steps from it. Sizes are in SVG units.
+type Graph struct {
+	Width, Height int
+	NodeW, NodeH  int
+	Bands         []GraphBand
+	Nodes         []GraphNode
+	Edges         []GraphEdge
 }
 
-// rootPath shows the chain from the root key to a member's keys, or that
-// there is none; who names the member ("you" on the member's own pages).
-templ rootPath(r *RootPath, who string) {
-	<section class="trust" aria-labelledby="root-path">
-		<h2 id="root-path">Path to the root key</h2>
-		switch {
-			case len(r.Steps) == 0:
-				<p class="muted">Not connected yet: no chain of certifications leads from the root key to { who }. A member who is connected can certify a key to connect it.</p>
-			case len(r.Steps) == 1:
-				<p class="muted">This is the root key: the web of trust is traced to it.</p>
-			default:
+// GraphBand labels a band, at X, Y above its first row.
+type GraphBand struct {
+	Label string
+	X, Y  int
+}
+
+// GraphNode is a member's box, with its top left corner at X, Y.
+type GraphNode struct {
+	X, Y          int
+	Name, Address string
+	URL           string
+	Root          bool
+	Unconnected   bool
+}
+
+// GraphEdge is a certification: an SVG path from the certifier's box to
+// the certified member's, and its tooltip.
+type GraphEdge struct {
+	D, Title string
+}
+
+templ graph(g Graph) {
+	<div class="graph-wrap">
+		<svg class="graph" width={ strconv.Itoa(g.Width) } height={ strconv.Itoa(g.Height) } viewBox={ "0 0 " + strconv.Itoa(g.Width) + " " + strconv.Itoa(g.Height) } role="img" aria-label="Who certified whom">
+			<defs>
+				<marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0 0L10 5L0 10z" class="graph-arrowhead"></path>
+				</marker>
+			</defs>
+			for _, b := range g.Bands {
+				<text class="graph-band" x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) }>{ b.Label }</text>
+			}
+			for _, e := range g.Edges {
+				<path class="graph-edge" d={ e.D } marker-end="url(#graph-arrow)">
+					<title>{ e.Title }</title>
+				</path>
+			}
+			for _, n := range g.Nodes {
+				<a href={ templ.URL(n.URL) } class={ "graph-node", templ.KV("root", n.Root), templ.KV("unconnected", n.Unconnected) }>
+					<rect x={ strconv.Itoa(n.X) } y={ strconv.Itoa(n.Y) } width={ strconv.Itoa(g.NodeW) } height={ strconv.Itoa(g.NodeH) } rx="8"></rect>
+					<text class="graph-name" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 19) }>{ n.Name }</text>
+					<text class="graph-address" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 35) }>{ n.Address }</text>
+				</a>
+			}
+		</svg>
+	</div>
+}
+
+// rootPath shows the chain from the root key to a member's keys, each key
+// certified by the one before it. The root key's holder has none.
+templ rootPath(r *RootPath) {
+	if len(r.Steps) != 1 {
+		<section class="trust" aria-labelledby="root-path">
+			<h2 id="root-path">Path from the root key</h2>
+			if len(r.Steps) == 0 {
+				<p class="muted">Not connected.</p>
+			} else {
 				<ol class="path">
-					for i, st := range r.Steps {
+					for _, st := range r.Steps {
 						<li>
 							@memberAddresses(st.Addresses)
-							if i == 0 {
-								<span class="badge ok">root</span>
-							}
 							<code class="fpr path-fpr">{ groupFingerprint(st.Fingerprint) }</code>
 						</li>
 					}
 				</ol>
-				<p class="certs">Each key certified the one after it.</p>
-		}
-	</section>
+			}
+		</section>
+	}
 }
 
 // Member shows a member and their keys as WKD serves them.
@@ -158,19 +185,15 @@ templ Member(p Page, v MemberView) {
 				<div>
 					<h1>{ v.Name }</h1>
 					<p class="muted">{ v.Address }</p>
+					if v.Root != nil && len(v.Root.Steps) == 1 {
+						<span class="badge ok">Root key</span>
+					}
 				</div>
 			</div>
 			<a class="btn" href={ templ.URL(v.Download) } hx-boost="false" download>Download keys</a>
 		</header>
-		if v.Self {
-			<p class="muted">This is how other members see you. <a href="/">Your keys</a> has the page to change them.</p>
-		}
 		if v.Root != nil {
-			if v.Self {
-				@rootPath(v.Root, "your keys")
-			} else {
-				@rootPath(v.Root, v.Name + "'s keys")
-			}
+			@rootPath(v.Root)
 		}
 		<section class="trust" aria-labelledby="member-keys">
 			<h2 id="member-keys">Keys</h2>
@@ -209,7 +232,7 @@ templ Member(p Page, v MemberView) {
 				</table>
 			</div>
 		</section>
-		<p class="muted">Fetch them with <code>gpg --locate-keys { v.Address }</code>. To certify a key, check its fingerprint with { v.Name } first.</p>
+		<p class="muted">Fetch these keys with <code>gpg --locate-keys { v.Address }</code>.</p>
 	}
 }
 

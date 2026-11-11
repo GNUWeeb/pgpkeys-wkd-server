@@ -109,8 +109,8 @@ func (s *Server) trust(w http.ResponseWriter, r *http.Request) {
 
 // trustFlash is the notice the web of trust page shows after a change.
 var trustFlash = map[string]ui.Flash{
-	"submitted": {Kind: "ok", Text: "Certification submitted. It is added once the key's owner accepts it."},
-	"accepted":  {Kind: "ok", Text: "Certification accepted and added to your key."},
+	"submitted": {Kind: "ok", Text: "Certification sent to the key's owner."},
+	"accepted":  {Kind: "ok", Text: "Certification accepted."},
 	"rejected":  {Kind: "ok", Text: "Certification rejected."},
 	"withdrawn": {Kind: "ok", Text: "Certification withdrawn."},
 }

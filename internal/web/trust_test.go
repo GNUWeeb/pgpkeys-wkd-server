@@ -69,7 +69,7 @@ func TestSubmitAndAcceptCertification(t *testing.T) {
 	}
 	_, body := h.get(aliceClient, "/trust")
 	m := regexp.MustCompile(`/trust/requests/(\d+)/accept`).FindStringSubmatch(body)
-	if m == nil || !strings.Contains(body, "No member") {
+	if m == nil || !strings.Contains(body, "None yet.") {
 		t.Fatal("alice's page does not show the request as waiting")
 	}
 	if resp, _ := h.post(bobClient, "/trust/requests/"+m[1]+"/accept", nil); resp.StatusCode != http.StatusNotFound {
@@ -154,7 +154,7 @@ func TestTrustShowsDirectLinks(t *testing.T) {
 	if !strings.Contains(in, `<a href="/members/bob@gnuweeb.org">bob@gnuweeb.org</a>`) || strings.Contains(in, "carol@") {
 		t.Error("alice's certifiers are not just bob")
 	}
-	if !strings.Contains(in, "Also certified by 1 key not in this directory") {
+	if !strings.Contains(in, "And 1 key not in this directory") {
 		t.Error("dave's certification is not counted")
 	}
 	if !strings.Contains(out, ">carol@gnuweeb.org</a>") || strings.Contains(out, "bob@") {
@@ -166,7 +166,7 @@ func TestTrustShowsDirectLinks(t *testing.T) {
 	}
 
 	in, out = sections("bob@gnuweeb.org")
-	if !strings.Contains(in, "has certified yours yet") {
+	if !strings.Contains(in, "None yet.") {
 		t.Error("bob's certifiers are not empty")
 	}
 	if !strings.Contains(out, ">alice@gnuweeb.org</a>") || !strings.Contains(out, "Test &lt;alice@gnuweeb.org&gt;") {

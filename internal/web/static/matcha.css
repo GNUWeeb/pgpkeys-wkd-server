@@ -564,6 +564,75 @@ main:focus {
 	color: var(--danger);
 }
 
+/* The web of trust graph on the members page: boxes for members, arrows
+   from certifier to certified. It scrolls sideways when wider than the
+   page. */
+
+.graph-wrap {
+	margin: 0 0 var(--block-gap);
+	overflow-x: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	background: var(--surface);
+	box-shadow: var(--shadow-sm);
+}
+
+.graph {
+	display: block;
+	font-family: var(--font-sans);
+}
+
+.graph-node rect {
+	fill: var(--surface-2);
+	stroke: var(--border);
+	stroke-width: 1;
+}
+
+.graph-node.root rect {
+	fill: var(--accent-soft);
+	stroke: var(--accent);
+}
+
+.graph-node.unconnected rect {
+	stroke-dasharray: 4 3;
+}
+
+.graph-node:hover rect,
+.graph-node:focus-visible rect {
+	stroke: var(--accent);
+	stroke-width: 2;
+}
+
+.graph-name {
+	fill: var(--text);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.graph-address {
+	fill: var(--muted);
+	font-size: 11px;
+}
+
+.graph-band {
+	fill: var(--muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.graph-edge {
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 1.5;
+	opacity: 0.7;
+}
+
+.graph-arrowhead {
+	fill: var(--muted);
+}
+
 /* The chain of certifications from the root key to a member, one key a
    line, each after an arrow from the key that certified it. */
 

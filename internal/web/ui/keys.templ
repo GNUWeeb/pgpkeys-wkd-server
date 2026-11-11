@@ -122,17 +122,13 @@ func anyProblems(list []keys.Info) bool {
 templ Keys(p Page, list []keys.Info, f Flash, address string) {
 	@Layout(p) {
 		<header class="page-head">
-			<div>
-				<h1>Your keys</h1>
-				<p class="muted">Keys published for <b>{ p.Address }</b> through Web Key Directory.</p>
-			</div>
+			<h1>Your keys</h1>
 			<a class="btn btn-primary" href="/keys/new">Add key</a>
 		</header>
 		@flash(f)
 		if len(list) == 0 {
 			<div class="empty">
 				<p class="empty-title">No keys yet</p>
-				<p>Add your public key, and <code>gpg --locate-keys { p.Address }</code> will find it.</p>
 				<a class="btn btn-primary" href="/keys/new">Add key</a>
 			</div>
 		} else {
@@ -177,7 +173,7 @@ templ Keys(p Page, list []keys.Info, f Flash, address string) {
 			if anyProblems(list) {
 				@fixes(list)
 			}
-			<p class="muted">Check with <code>gpg --locate-keys { address }</code>. A reminder comes by mail before a key stops signing.</p>
+			<p class="muted">Anyone can fetch your keys with <code>gpg --locate-keys { address }</code>.</p>
 		}
 	}
 }
@@ -189,7 +185,7 @@ templ AddKey(p Page, pasted, errText string, fix *keys.Problem, maxKiB int) {
 		<header class="page-head">
 			<div>
 				<h1>Add key</h1>
-				<p class="muted">The key needs a User ID with <b>{ p.Address }</b>. Uploading a key again replaces it, for example after you extended its expiry.</p>
+				<p class="muted">Needs a User ID with <b>{ p.Address }</b>. Uploading a key again replaces it.</p>
 			</div>
 		</header>
 		if errText != "" {
@@ -208,12 +204,12 @@ templ AddKey(p Page, pasted, errText string, fix *keys.Problem, maxKiB int) {
 			<label class="field">
 				<span>Paste the public key</span>
 				<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
-				<small class="muted">Output of <code>gpg --armor --export { p.Address }</code>.</small>
+				<small class="muted">Export it with <code>gpg --armor --export { p.Address }</code>.</small>
 			</label>
 			<label class="field">
 				<span>Or choose a file</span>
 				<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
-				<small class="muted">Armored or binary, up to { maxKiB } KiB.</small>
+				<small class="muted">Up to { maxKiB } KiB.</small>
 			</label>
 			<div class="actions">
 				<button type="submit" class="btn btn-primary">Add key</button>
@@ -228,7 +224,7 @@ templ RemoveKey(p Page, k keys.Info) {
 	@Layout(p) {
 		<section class="card">
 			<h1>Remove key?</h1>
-			<p>WKD stops serving this key for <b>{ p.Address }</b> at once. Copies that others already fetched stay with them.</p>
+			<p>WKD stops serving it for <b>{ p.Address }</b>.</p>
 			<p><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></p>
 			<ul class="uids">
 				for _, id := range k.UserIDs {
