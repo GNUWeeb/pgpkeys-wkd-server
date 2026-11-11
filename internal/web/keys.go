@@ -127,22 +127,31 @@ func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, ui.AddKey(p, "", "", nil, keys.MaxSize>>10))
 }
 
-// addKey stores an uploaded key: the chosen file if there is one, the
-// pasted text otherwise.
-func (s *Server) addKey(w http.ResponseWriter, r *http.Request) {
-	addr := sessionAddress(r)
-	pasted := r.PostFormValue("key")
-	input := []byte(pasted)
-	if f, _, err := r.FormFile("file"); err == nil {
+// formKey returns the pasted text of a key form and the key to use: the
+// chosen file if there is one, the pasted text otherwise.
+func formKey(r *http.Request) (pasted string, input []byte, err error) {
+	pasted = r.PostFormValue("key")
+	input = []byte(pasted)
+	if f, _, ferr := r.FormFile("file"); ferr == nil {
 		b, err := io.ReadAll(io.LimitReader(f, keys.MaxSize+1))
 		f.Close()
 		if err != nil {
-			s.internalError(w, r, err)
-			return
+			return "", nil, err
 		}
 		if len(b) > 0 {
 			input = b
 		}
+	}
+	return pasted, input, nil
+}
+
+// addKey stores an uploaded key.
+func (s *Server) addKey(w http.ResponseWriter, r *http.Request) {
+	addr := sessionAddress(r)
+	pasted, input, err := formKey(r)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
 	}
 
 	fail := func(msg string, fix *keys.Problem) {

@@ -17,39 +17,159 @@ type TrustLink struct {
 	Certified time.Time
 }
 
-// Trust shows the members linked to the member by certifications: those
-// whose keys certified the member's keys (in, plus others by keys not in
-// the directory) and those whose keys the member's keys certified (out).
-templ Trust(p Page, in []TrustLink, others int, out []TrustLink) {
+// CertRequest is a submitted certification that waits for the owner of
+// the certified key.
+type CertRequest struct {
+	ID int64
+	// Members are the other side's addresses: the submitter of a request
+	// that waits for the member, the key's owner for one the member sent.
+	Members []MemberAddress
+	// Fingerprint is the other side's key: the certifying key, or the
+	// certified one.
+	Fingerprint string
+	UserID      string
+	Created     time.Time
+}
+
+// TrustView is what the web of trust page shows: the members whose keys
+// certified the member's keys (In, plus Others by keys not in the
+// directory), those whose keys the member's keys certified (Out), and the
+// submitted certifications that wait for the member (Waiting) or that the
+// member sent (Sent).
+type TrustView struct {
+	In, Out       []TrustLink
+	Others        int
+	Waiting, Sent []CertRequest
+}
+
+// Trust shows the members linked to the member by certifications and the
+// certifications that wait for approval.
+templ Trust(p Page, v TrustView, f Flash) {
 	@Layout(p) {
 		<header class="page-head">
 			<div>
 				<h1>Web of trust</h1>
 				<p class="muted">Members whose keys are linked to yours by certifications. Publishing a key does not depend on them.</p>
 			</div>
+			<a class="btn btn-primary" href="/trust/certify">Submit a certification</a>
 		</header>
+		@flash(f)
+		if len(v.Waiting) > 0 {
+			<section class="trust" aria-labelledby="trust-waiting">
+				<h2 id="trust-waiting">Waiting for your approval</h2>
+				@requestTable(p, v.Waiting, "Certifying key", true)
+				<p class="certs">Accepting adds the certification to your key in this directory. Web Key Directory serves your key without it.</p>
+			</section>
+		}
 		<section class="trust" aria-labelledby="trust-in">
 			<h2 id="trust-in">Certified your keys</h2>
-			if len(in) == 0 {
+			if len(v.In) == 0 {
 				<p class="muted">No member's key has certified yours yet.</p>
 			} else {
-				@trustTable(in)
+				@trustTable(v.In)
 			}
-			if others == 1 {
+			if v.Others == 1 {
 				<p class="certs">Also certified by 1 key not in this directory</p>
-			} else if others > 1 {
-				<p class="certs">Also certified by { fmt.Sprint(others) } keys not in this directory</p>
+			} else if v.Others > 1 {
+				<p class="certs">Also certified by { fmt.Sprint(v.Others) } keys not in this directory</p>
 			}
 		</section>
 		<section class="trust" aria-labelledby="trust-out">
 			<h2 id="trust-out">Certified by your keys</h2>
-			if len(out) == 0 {
+			if len(v.Out) == 0 {
 				<p class="muted">Your keys have not certified any member's key yet.</p>
 			} else {
-				@trustTable(out)
+				@trustTable(v.Out)
 			}
 		</section>
-		<p class="muted">A certification shows here once the certified key is uploaded with it: after you certify a key, send it to its owner, who imports it and uploads it again.</p>
+		if len(v.Sent) > 0 {
+			<section class="trust" aria-labelledby="trust-sent">
+				<h2 id="trust-sent">Sent, waiting for approval</h2>
+				@requestTable(p, v.Sent, "Certified key", false)
+			</section>
+		}
+	}
+}
+
+// requestTable lists certification requests, with Accept and Reject for
+// those that wait for the member (incoming) and Withdraw for the others.
+templ requestTable(p Page, reqs []CertRequest, keyHeading string, incoming bool) {
+	<div class="tbl-wrap">
+		<table class="tbl">
+			<thead>
+				<tr>
+					<th scope="col">Member</th>
+					<th scope="col">{ keyHeading }</th>
+					<th scope="col">User ID</th>
+					<th scope="col">Certified</th>
+					<th scope="col"><span class="sr-only">Actions</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, c := range reqs {
+					<tr>
+						<td>
+							@memberAddresses(c.Members)
+						</td>
+						<td><code class="fpr">{ groupFingerprint(c.Fingerprint) }</code></td>
+						<td>{ c.UserID }</td>
+						<td><time datetime={ c.Created.UTC().Format(time.RFC3339) }>{ date(c.Created) }</time></td>
+						<td class="actions-cell">
+							<div class="actions">
+								if incoming {
+									@requestButton(p, c.ID, "accept", "Accept", "btn btn-primary")
+									@requestButton(p, c.ID, "reject", "Reject", "btn btn-danger")
+								} else {
+									@requestButton(p, c.ID, "withdraw", "Withdraw", "btn btn-danger")
+								}
+							</div>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ requestButton(p Page, id int64, action, label, class string) {
+	<form method="post" action={ templ.SafeURL(fmt.Sprintf("/trust/requests/%d/%s", id, action)) }>
+		@CSRFField(p.CSRF)
+		<button type="submit" class={ class }>{ label }</button>
+	</form>
+}
+
+// Certify is the form for submitting a certification; pasted and errText
+// refill it after an error.
+templ Certify(p Page, pasted, errText string, maxKiB int) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Submit a certification</h1>
+				<p class="muted">Certified another member's key with yours? Submit it here. Its owner is asked by mail and the certification is added once they accept it. Only certifications made by your own keys are taken from what you submit.</p>
+			</div>
+		</header>
+		if errText != "" {
+			<div class="flash danger" role="alert">
+				<p>{ errText }</p>
+			</div>
+		}
+		<form method="post" action="/trust/certify" enctype="multipart/form-data" class="card stack">
+			@CSRFField(p.CSRF)
+			<label class="field">
+				<span>Paste the certified key</span>
+				<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
+				<small class="muted">Check the fingerprint with its owner, certify it with <code>gpg --sign-key their@gnuweeb.org</code>, then paste the output of <code>gpg --armor --export their@gnuweeb.org</code>.</small>
+			</label>
+			<label class="field">
+				<span>Or choose a file</span>
+				<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
+				<small class="muted">Armored or binary, up to { maxKiB } KiB.</small>
+			</label>
+			<div class="actions">
+				<button type="submit" class="btn btn-primary">Submit</button>
+				<a class="btn" href="/trust">Cancel</a>
+			</div>
+		</form>
 	}
 }
 

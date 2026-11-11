@@ -275,7 +275,7 @@ func TestMembersSeeOnlyTheirOwnKeys(t *testing.T) {
 func TestKeyPagesNeedLogin(t *testing.T) {
 	h := newHarness(t)
 	c := h.newClient()
-	for _, path := range []string{"/", "/keys/new", "/keys/" + strings.Repeat("A", 40) + "/remove", "/trust"} {
+	for _, path := range []string{"/", "/keys/new", "/keys/" + strings.Repeat("A", 40) + "/remove", "/trust", "/trust/certify"} {
 		if resp, _ := h.get(c, path); resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
 			t.Errorf("GET %s: %d to %q", path, resp.StatusCode, resp.Header.Get("Location"))
 		}
