@@ -46,6 +46,8 @@ Settled by the maintainer on 2026-11-11:
 | Go module path | `git.gnuweeb.net/GNUWeeb/matcha`, the URL the project gets once renamed. |
 | Listeners | Two addresses: `WKD_ADDR` for the WKD routes, reachable only by the `gnuweeb.org` nginx, and `DASHBOARD_ADDR` for `pgp.gnuweeb.org`. Dashboard routes do not exist on the WKD listener and the reverse. |
 | Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
+| DSA keys | Refused, although `sq` 1.3.1 accepts DSA-2048 (confirmed 2026-11-11 after phase 6 found the difference). |
+| Revoked keys in the export | Kept in `keys/`, so importing the keyring spreads the revocation; kernel.org removes them by hand instead (confirmed 2026-11-11). |
 
 ## Where We Are (observed)
 
@@ -229,7 +231,6 @@ greentea is Go with templ templates. Its stylesheet is a reference, not a source
 
 - Checked in phase 2: `go-crypto`'s `Identity.Signatures` holds every signature on a User ID, self-signatures included, not only third-party ones; `ReadKeyRing` rejects a key whose User ID self-signature does not verify and lists only self-signed User IDs. GnuPG accepts the WKD view (`--check-sigs`: all good), and a certification by another key verifies with `VerifyUserIdSignature`.
 - Chosen in phase 2: `modernc.org/sqlite`, a pure-Go driver, so `CGO_ENABLED=0` builds keep working.
-- Checked in phase 6: `sq` 1.3.1 accepts a DSA-2048 key made by GnuPG 2.4.9, so "DSA keys are rejected" in the kernel.org reference model does not hold for `sq` itself. The rule here refuses DSA, as phase 6 lists it.
 - Checked in phase 6: GnuPG 2.4.9 keeps the hash of the self-signature it replaces, so `gpg --quick-set-expire` alone left a SHA-1 key on SHA-1; with `--cert-digest-algo SHA512` the new self-signatures used SHA-512 and the key passed. kernel.org's documentation says a recent GnuPG repairs such keys; 2.4.9 does not.
 - Renaming the GitLab project needs the owner's agreement.
 
