@@ -232,7 +232,7 @@ Changed 2026-11-11, after members asked in the group chat: a "Members" page list
 
 Changed 2026-11-11, after the maintainer's review: the optional graph is built after all, on the members page, as SVG drawn by the server (no script). It replaces the list's column of steps from the root key. The dashboard's pages also lost most of their explanatory sentences; the gpg commands stay, each with a few words on what it is for. Checked in a browser in light and dark: the stand-in root key on top, the bands below it, arrows that skip a band routed along the left of the boxes.
 
-Changed 2026-11-11, after the maintainer's review: the chain from the root key shows as one line of names, on member pages and on the member's own web of trust page; the graph highlights the viewer's own chain; "Not connected" became "No path from root key", since it means only that no chain of certifications leads there, at any length.
+Changed 2026-11-11, after the maintainer's review: the chain from the root key shows as one line of names, on member pages and on the member's own web of trust page; the graph highlights the viewer's own chain, dashes the certifications of members with no path, marks where each arrow starts and scales to the page; "Not connected" became "No path from root key", since it means only that no chain of certifications leads there, at any length.
 
 ## Design Reference: greentea (observed)
 
