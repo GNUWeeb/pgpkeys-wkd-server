@@ -718,7 +718,7 @@ textarea:focus-visible {
 	margin-top: var(--space-1);
 }
 
-/* Who certified a User ID, under it. */
+/* Notes on certifications on the web of trust page. */
 .certs {
 	display: block;
 	margin: var(--space-1) 0 0;
