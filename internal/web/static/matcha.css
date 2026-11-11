@@ -577,8 +577,13 @@ main:focus {
 	box-shadow: var(--shadow-sm);
 }
 
+/* The drawing fills the box's width, larger or smaller than its own size,
+   up to most of the screen's height; the viewBox keeps its proportions. */
 .graph {
 	display: block;
+	width: 100%;
+	height: auto;
+	max-height: 70vh;
 	font-family: var(--font-sans);
 }
 
@@ -627,6 +632,13 @@ main:focus {
 	stroke: var(--muted);
 	stroke-width: 1.5;
 	opacity: 0.7;
+}
+
+/* Certifications by members the root key does not reach: no chain can
+   use them. */
+.graph-edge.dead {
+	stroke-dasharray: 5 4;
+	opacity: 0.45;
 }
 
 .graph-arrowhead {

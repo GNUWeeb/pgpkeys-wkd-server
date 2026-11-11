@@ -125,6 +125,7 @@ func layoutGraph(rows []ui.MemberRow, links [][2]string, mine []string) ui.Graph
 			D:     edgePath(g.Nodes[from], g.Nodes[to]),
 			Title: l[0] + " certified " + l[1],
 			Mine:  onPath(l),
+			Dead:  g.Nodes[from].Unconnected,
 		})
 	}
 	return g
