@@ -233,6 +233,8 @@ Changed 2026-11-11, after the maintainer's review: the optional graph is built a
 
 Changed 2026-11-11, after the maintainer's review: the chain from the root key shows as one line of names, on member pages and on the member's own web of trust page; the graph highlights the viewer's own chain, dashes the certifications of members with no path, marks where each arrow starts and scales to the page; "Not connected" became "No path from root key", since it means only that no chain of certifications leads there, at any length.
 
+Changed 2026-11-11, after the maintainer's review: member pages gain "Sign this key", a page with the GnuPG commands to certify that member's keys, their fingerprints filled in, followed by the certification form; and the line "Fetch these keys with `gpg --locate-keys ...`" became a button that copies the command. Commands on the new page have copy buttons too. The buttons need the Clipboard API, so a small script of our own (`matcha.js`) joins htmx; without it, or outside a secure context, the buttons stay hidden and the text stays on the page. Checked in headless Chromium against a local instance: the copy button put the command on the clipboard, a GnuPG 2.4.9 certification made with the page's commands was accepted from its form and an uncertified key came back to the same page with the error, in light and dark and at 390 px without widening the page; with JavaScript off the buttons were hidden and the command line showed.
+
 ## Design Reference: greentea (observed)
 
 greentea is Go with templ templates. Its stylesheet is a reference, not a source to copy.
