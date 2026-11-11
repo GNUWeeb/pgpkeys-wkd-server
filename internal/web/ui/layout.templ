@@ -1,6 +1,9 @@
 package ui
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Page is what every page's frame needs.
 type Page struct {
@@ -120,6 +123,15 @@ templ CSRFField(token string) {
 // the script can copy, so the text must also be on the page.
 templ copyButton(text, label string) {
 	<button type="button" class="btn" data-copy={ text } title={ text }>{ label }</button>
+}
+
+// command shows shell commands, one per line, with a button that copies
+// them all.
+templ command(lines []string) {
+	<div class="cmd-copy">
+		<pre class="cmd"><code>{ strings.Join(lines, "\n") }</code></pre>
+		@copyButton(strings.Join(lines, "\n"), "Copy")
+	</div>
 }
 
 // Message is a page that only says something: an error, or a notice

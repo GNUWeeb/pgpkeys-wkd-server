@@ -50,6 +50,9 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 	}
 	now := s.now()
 	v := ui.MemberView{Address: addr, Download: memberURL(addr) + "/keys.asc", Photo: s.photoURL(addr)}
+	if addr != sessionAddress(r) {
+		v.Sign = memberURL(addr) + "/sign"
+	}
 	fprs := make([]string, 0, len(stored))
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)

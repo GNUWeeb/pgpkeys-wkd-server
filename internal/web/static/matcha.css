@@ -744,6 +744,45 @@ html:not(.can-copy) [data-copy] {
 	display: none;
 }
 
+/* A command with its copy button beside it, in one box: the command
+   scrolls on a narrow screen without running under the button. */
+
+.cmd-copy {
+	display: flex;
+	align-items: flex-start;
+	margin: 0 0 var(--space-3);
+	border-radius: var(--radius-sm);
+	background: var(--surface-2);
+}
+
+.cmd-copy .cmd {
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+}
+
+.cmd-copy .btn {
+	flex: none;
+	min-height: 1.75rem;
+	margin: var(--space-2) var(--space-2) 0 0;
+	padding: 0 var(--space-2);
+	font-size: var(--text-sm);
+}
+
+/* Numbered steps, such as how to sign a member's key. */
+
+.steps {
+	padding-left: 2.5rem;
+}
+
+.steps > li + li {
+	margin-top: var(--space-4);
+}
+
+.steps p {
+	margin: 0 0 var(--space-2);
+}
+
 .empty {
 	display: flex;
 	flex-direction: column;

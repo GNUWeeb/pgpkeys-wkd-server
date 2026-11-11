@@ -20,6 +20,8 @@ type MemberView struct {
 	Keys []keys.Info
 	// Download serves the keys, armored.
 	Download string
+	// Sign is their "Sign this key" page; empty on the viewer's own page.
+	Sign string
 	// Root is the chain of certifications from the root key, nil when no
 	// root key is set.
 	Root *RootPath
@@ -219,6 +221,9 @@ templ Member(p Page, v MemberView) {
 				</div>
 			</div>
 			<div class="actions">
+				if v.Sign != "" {
+					<a class="btn btn-primary" href={ templ.URL(v.Sign) }>Sign this key</a>
+				}
 				@copyButton("gpg --locate-keys "+v.Address, "Download via gpg")
 				<a class="btn" href={ templ.URL(v.Download) } hx-boost="false" download>Download keys</a>
 			</div>

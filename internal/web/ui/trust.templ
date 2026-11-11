@@ -140,36 +140,132 @@ templ requestButton(p Page, id int64, action, label, class string) {
 	</form>
 }
 
+// SignTarget is the member a "Sign this key" page is about.
+type SignTarget struct {
+	Name, Address, URL string
+	// Keys are the fingerprints of their keys that can be certified:
+	// neither expired nor revoked.
+	Keys []string
+	// Own are the fingerprints of the viewer's stored keys; only their
+	// certifications are taken.
+	Own []string
+}
+
 // Certify is the form for submitting a certification; pasted and errText
-// refill it after an error.
-templ Certify(p Page, pasted, errText string, maxKiB int) {
+// refill it after an error. With a target it is that member's "Sign this
+// key" page: the GnuPG commands for their keys come first.
+templ Certify(p Page, target *SignTarget, pasted, errText string, maxKiB int) {
 	@Layout(p) {
 		<header class="page-head">
-			<h1>Submit a certification</h1>
+			if target != nil {
+				<div>
+					<h1>{ p.Title }</h1>
+					<p class="muted">{ target.Address }</p>
+				</div>
+			} else {
+				<h1>Submit a certification</h1>
+			}
 		</header>
 		if errText != "" {
 			<div class="flash danger" role="alert">
 				<p>{ errText }</p>
 			</div>
 		}
-		<form method="post" action="/trust/certify" enctype="multipart/form-data" class="card stack">
-			@CSRFField(p.CSRF)
-			<label class="field">
-				<span>Paste the key you certified</span>
-				<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
-				<small class="muted">Certify it with <code>gpg --sign-key their@gnuweeb.org</code>, then export it with <code>gpg --armor --export their@gnuweeb.org</code>.</small>
-			</label>
-			<label class="field">
-				<span>Or choose a file</span>
-				<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
-				<small class="muted">Up to { maxKiB } KiB.</small>
-			</label>
-			<div class="actions">
-				<button type="submit" class="btn btn-primary">Submit</button>
-				<a class="btn" href="/trust">Cancel</a>
+		if target != nil && len(target.Keys) == 0 {
+			<div class="empty">
+				<p class="empty-title">No key to sign</p>
+				<p class="muted">Their keys have expired or are revoked.</p>
+				<a class="btn" href={ templ.URL(target.URL) }>Back</a>
 			</div>
-		</form>
+		} else {
+			if target != nil {
+				@signSteps(*target)
+			}
+			<form method="post" action="/trust/certify" enctype="multipart/form-data" class="card stack">
+				@CSRFField(p.CSRF)
+				if target != nil {
+					<input type="hidden" name="member" value={ target.Address }/>
+				}
+				<label class="field">
+					<span>Paste the key you certified</span>
+					<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
+					if target == nil {
+						<small class="muted">Certify it with <code>gpg --sign-key their@gnuweeb.org</code>, then export it with <code>gpg --armor --export their@gnuweeb.org</code>.</small>
+					}
+				</label>
+				<label class="field">
+					<span>Or choose a file</span>
+					<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
+					<small class="muted">Up to { maxKiB } KiB.</small>
+				</label>
+				<div class="actions">
+					<button type="submit" class="btn btn-primary">Submit</button>
+					if target != nil {
+						<a class="btn" href={ templ.URL(target.URL) }>Cancel</a>
+					} else {
+						<a class="btn" href="/trust">Cancel</a>
+					}
+				</div>
+			</form>
+		}
 	}
+}
+
+// signSteps tells how to certify the target's keys with GnuPG and get
+// them into the form below.
+templ signSteps(t SignTarget) {
+	if len(t.Own) == 0 {
+		<div class="flash danger" role="alert">
+			<p>Add your own key first: only certifications made with one of your keys in the directory are taken. <a href="/keys/new">Add key</a></p>
+		</div>
+	}
+	<ol class="card steps">
+		<li>
+			<p><strong>Fetch the key.</strong></p>
+			@command([]string{"gpg --locate-keys " + t.Address})
+		</li>
+		<li>
+			<p><strong>Check the fingerprint with { t.Name }</strong>, in person or on a call. Sign only if it matches:</p>
+			for _, fpr := range t.Keys {
+				<p><code class="fpr">{ groupFingerprint(fpr) }</code></p>
+			}
+		</li>
+		<li>
+			<p><strong>Sign it.</strong></p>
+			@command(signCommands(t))
+			if len(t.Own) > 1 {
+				<p class="muted">GnuPG signs with your default key. To sign with another of your keys, add <code>-u</code> and its fingerprint.</p>
+			}
+		</li>
+		<li>
+			<p><strong>Export it</strong> and paste it below{ oneAtATime(t) }.</p>
+			for _, fpr := range t.Keys {
+				@command([]string{"gpg --armor --export " + fpr})
+			}
+		</li>
+	</ol>
+}
+
+// signCommands certify each of the target's keys, with the viewer's key
+// when they have exactly one in the directory, so GnuPG cannot pick
+// another.
+func signCommands(t SignTarget) []string {
+	signer := ""
+	if len(t.Own) == 1 {
+		signer = "-u " + t.Own[0] + " "
+	}
+	out := make([]string, 0, len(t.Keys))
+	for _, fpr := range t.Keys {
+		out = append(out, "gpg "+signer+"--sign-key "+fpr)
+	}
+	return out
+}
+
+func oneAtATime(t SignTarget) string {
+	if len(t.Keys) > 1 {
+		return ", one key at a time"
+	}
+	return ""
 }
 
 templ trustTable(links []TrustLink) {
