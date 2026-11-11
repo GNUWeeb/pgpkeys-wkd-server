@@ -306,9 +306,11 @@ main:focus {
 	width: 100%;
 }
 
+/* The content fills the width beside the sidebar, up to a width where
+   tables would only gain empty space. */
 .page {
 	width: 100%;
-	max-width: 72rem;
+	max-width: 120rem;
 	padding: var(--space-6) var(--space-8) var(--space-8);
 }
 
@@ -513,11 +515,6 @@ main:focus {
 
 .btn-danger-solid:hover {
 	filter: brightness(1.1);
-}
-
-.btn-quiet {
-	border-color: transparent;
-	background: transparent;
 }
 
 .flash {
