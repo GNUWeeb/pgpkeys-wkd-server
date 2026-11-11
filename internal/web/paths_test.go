@@ -54,8 +54,8 @@ func TestRootPaths(t *testing.T) {
 	h.srv.opts.RootKey = strings.ToUpper(fingerprintHex(root.PrimaryKey.Fingerprint))
 	_, body := h.get(c, "/members/bob@gnuweeb.org")
 	path := body[strings.Index(body, `class="path"`):]
-	path = path[:strings.Index(path, "</ol>")]
-	r, a, b := strings.Index(path, "root@gnuweeb.org"), strings.Index(path, "alice@gnuweeb.org"), strings.Index(path, "bob@gnuweeb.org")
+	path = path[:strings.Index(path, "</p>")]
+	r, a, b := strings.Index(path, `href="/members/root@`), strings.Index(path, `href="/members/alice@`), strings.Index(path, `href="/members/bob@`)
 	if r < 0 || r > a || a > b || strings.Contains(path, "carol@") {
 		t.Errorf("bob's path is not root, alice, bob: %s", path)
 	}
@@ -86,14 +86,23 @@ func TestRootPaths(t *testing.T) {
 			t.Errorf("graph lacks %q", edge)
 		}
 	}
-	if n := strings.Count(graph, `class="graph-edge"`); n != 4 {
+	if n := strings.Count(graph, `class="graph-edge`); n != 4 {
 		t.Errorf("graph has %d arrows, want 4", n)
 	}
-	if bands := []int{strings.Index(graph, ">Root key<"), strings.Index(graph, ">1 step<"), strings.Index(graph, ">2 steps<"), strings.Index(graph, ">Not connected<")}; !slices.IsSorted(bands) || bands[0] < 0 {
+	// Bob, looking, sees his own chain highlighted: root to alice to bob.
+	var mine []string
+	for _, m := range regexp.MustCompile(`class="graph-edge mine"[^>]*>\s*<title>([^<]*)</title>`).FindAllStringSubmatch(graph, -1) {
+		mine = append(mine, m[1])
+	}
+	slices.Sort(mine)
+	if want := []string{"alice@gnuweeb.org certified bob@gnuweeb.org", "root@gnuweeb.org certified alice@gnuweeb.org"}; !slices.Equal(mine, want) {
+		t.Errorf("highlighted arrows: %v, want %v", mine, want)
+	}
+	if bands := []int{strings.Index(graph, ">Root key<"), strings.Index(graph, ">1 step<"), strings.Index(graph, ">2 steps<"), strings.Index(graph, ">No path from root key<")}; !slices.IsSorted(bands) || bands[0] < 0 {
 		t.Errorf("graph bands out of order: %v", bands)
 	}
-	if _, body := h.get(h.loginAs("dave@gnuweeb.org"), "/trust"); !strings.Contains(body, "Not connected.") {
-		t.Error("dave's web of trust page does not say he is not connected")
+	if _, body := h.get(c, "/members/dave@gnuweeb.org"); !strings.Contains(body, "No path from the root key.") {
+		t.Error("dave's page does not say no path leads to him")
 	}
 
 	// A root key that is not stored connects no one.

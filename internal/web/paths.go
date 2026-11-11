@@ -55,9 +55,10 @@ func (s *Server) rootPaths(signers []keys.Signer, certified map[string][]string)
 }
 
 // rootPathView is the shortest of the chains in paths that lead to one of
-// the keys fprs, a member's keys, with the addresses of each key on it.
+// the keys fprs, a member's keys, with the addresses of each key on it and,
+// when name is not nil, the name it gives each key.
 // Its Steps are empty when no chain leads there.
-func (s *Server) rootPathView(paths, addresses map[string][]string, fprs []string) *ui.RootPath {
+func (s *Server) rootPathView(paths, addresses map[string][]string, fprs []string, name func(fpr string) string) *ui.RootPath {
 	var best []string
 	for _, f := range fprs {
 		if p, ok := paths[f]; ok && (best == nil || len(p) < len(best)) {
@@ -66,9 +67,33 @@ func (s *Server) rootPathView(paths, addresses map[string][]string, fprs []strin
 	}
 	v := &ui.RootPath{}
 	for _, f := range best {
-		v.Steps = append(v.Steps, ui.PathStep{Fingerprint: f, Addresses: s.memberAddresses(addresses[f])})
+		st := ui.PathStep{Fingerprint: f, Addresses: s.memberAddresses(addresses[f])}
+		if name != nil {
+			st.Name = name(f)
+		}
+		v.Steps = append(v.Steps, st)
 	}
 	return v
+}
+
+// keyNames names a stored key by the name in its User ID with the first
+// address it is stored for, or that address.
+func keyNames(signers []keys.Signer, addresses map[string][]string, now time.Time) func(string) string {
+	return func(fpr string) string {
+		addr := ""
+		if a := addresses[fpr]; len(a) > 0 {
+			addr = a[0]
+		}
+		i := slices.IndexFunc(signers, func(k keys.Signer) bool { return k.Fingerprint == fpr })
+		if i < 0 {
+			return addr
+		}
+		info, err := keys.Describe(signers[i].Data, now)
+		if err != nil {
+			return addr
+		}
+		return displayName([]keys.Info{info}, addr)
+	}
 }
 
 // rootPathOf is rootPathView for the member whose keys are fprs, read
@@ -86,5 +111,6 @@ func (s *Server) rootPathOf(ctx context.Context, fprs []string) (*ui.RootPath, e
 	if err != nil {
 		return nil, err
 	}
-	return s.rootPathView(s.rootPaths(signers, certified), addresses, fprs), nil
+	now := s.now()
+	return s.rootPathView(s.rootPaths(signers, certified), addresses, fprs, keyNames(signers, addresses, now)), nil
 }

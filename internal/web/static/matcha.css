@@ -633,35 +633,34 @@ main:focus {
 	fill: var(--muted);
 }
 
-/* The chain of certifications from the root key to a member, one key a
-   line, each after an arrow from the key that certified it. */
+/* The viewer's own chain from the root key. */
+
+.graph-edge.mine {
+	stroke: var(--accent);
+	stroke-width: 2.5;
+	opacity: 1;
+}
+
+.graph-arrowhead.mine {
+	fill: var(--accent);
+}
+
+.graph-node.mine rect {
+	stroke: var(--accent);
+	stroke-width: 2;
+}
+
+/* The chain from the root key to a member, on one line. */
 
 .path {
 	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-
-.path li {
-	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0 var(--space-2);
+	gap: var(--space-1) var(--space-2);
+	margin: 0;
 }
 
-.path li + li::before {
-	content: "\2192";
-	color: var(--muted);
-}
-
-.path .path-fpr {
-	flex-basis: 100%;
-	padding: 0;
-	background: none;
-	font-size: var(--text-xs);
+.path-arrow {
 	color: var(--muted);
 }
 

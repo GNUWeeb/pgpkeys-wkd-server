@@ -121,7 +121,7 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 			for _, k := range byAddress[addr] {
 				fprs = append(fprs, k.Fingerprint)
 			}
-			row.Root = s.rootPathView(paths, addresses, fprs)
+			row.Root = s.rootPathView(paths, addresses, fprs, nil)
 		}
 		rows = append(rows, row)
 	}
@@ -142,9 +142,24 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// The session's own chain from the root key, by address, highlighted.
+	var mine []string
+	me := sessionAddress(r)
+	for _, m := range rows {
+		if m.Address == me && m.Root != nil {
+			for i, st := range m.Root.Steps {
+				switch {
+				case i == len(m.Root.Steps)-1:
+					mine = append(mine, me)
+				case len(st.Addresses) > 0:
+					mine = append(mine, st.Addresses[0].Address)
+				}
+			}
+		}
+	}
 	p := s.page(r, "Members")
 	p.Nav = "/members"
-	s.render(w, r, http.StatusOK, ui.Members(p, rows, layoutGraph(rows, links)))
+	s.render(w, r, http.StatusOK, ui.Members(p, rows, layoutGraph(rows, links, mine)))
 }
 
 // blankPNG is a transparent pixel: the photo of a member who has none,

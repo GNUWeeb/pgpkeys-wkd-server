@@ -32,10 +32,12 @@ type RootPath struct {
 	Steps []PathStep
 }
 
-// PathStep is a key on a chain, with the addresses it is stored for.
+// PathStep is a key on a chain, with the addresses it is stored for and
+// the name in its User ID.
 type PathStep struct {
 	Fingerprint string
 	Addresses   []MemberAddress
+	Name        string
 }
 
 // MemberRow is a member in the list of members.
@@ -119,12 +121,16 @@ type GraphNode struct {
 	URL           string
 	Root          bool
 	Unconnected   bool
+	// Mine is set on the viewer's own chain from the root key.
+	Mine bool
 }
 
 // GraphEdge is a certification: an SVG path from the certifier's box to
-// the certified member's, and its tooltip.
+// the certified member's, and its tooltip. Mine is set on the viewer's
+// own chain from the root key.
 type GraphEdge struct {
 	D, Title string
+	Mine     bool
 }
 
 templ graph(g Graph) {
@@ -134,17 +140,26 @@ templ graph(g Graph) {
 				<marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 					<path d="M0 0L10 5L0 10z" class="graph-arrowhead"></path>
 				</marker>
+				<marker id="graph-arrow-mine" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0 0L10 5L0 10z" class="graph-arrowhead mine"></path>
+				</marker>
 			</defs>
 			for _, b := range g.Bands {
 				<text class="graph-band" x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) }>{ b.Label }</text>
 			}
 			for _, e := range g.Edges {
-				<path class="graph-edge" d={ e.D } marker-end="url(#graph-arrow)">
-					<title>{ e.Title }</title>
-				</path>
+				if e.Mine {
+					<path class="graph-edge mine" d={ e.D } marker-end="url(#graph-arrow-mine)">
+						<title>{ e.Title }</title>
+					</path>
+				} else {
+					<path class="graph-edge" d={ e.D } marker-end="url(#graph-arrow)">
+						<title>{ e.Title }</title>
+					</path>
+				}
 			}
 			for _, n := range g.Nodes {
-				<a href={ templ.URL(n.URL) } class={ "graph-node", templ.KV("root", n.Root), templ.KV("unconnected", n.Unconnected) }>
+				<a href={ templ.URL(n.URL) } class={ "graph-node", templ.KV("root", n.Root), templ.KV("unconnected", n.Unconnected), templ.KV("mine", n.Mine) }>
 					<rect x={ strconv.Itoa(n.X) } y={ strconv.Itoa(n.Y) } width={ strconv.Itoa(g.NodeW) } height={ strconv.Itoa(g.NodeH) } rx="8"></rect>
 					<text class="graph-name" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 19) }>{ n.Name }</text>
 					<text class="graph-address" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 35) }>{ n.Address }</text>
@@ -154,23 +169,28 @@ templ graph(g Graph) {
 	</div>
 }
 
-// rootPath shows the chain from the root key to a member's keys, each key
-// certified by the one before it. The root key's holder has none.
+// rootPath shows the chain from the root key to a member's keys on one
+// line, by name, each key certified by the one before it. The root key's
+// holder has none.
 templ rootPath(r *RootPath) {
 	if len(r.Steps) != 1 {
 		<section class="trust" aria-labelledby="root-path">
 			<h2 id="root-path">Path from the root key</h2>
 			if len(r.Steps) == 0 {
-				<p class="muted">Not connected.</p>
+				<p class="muted">No path from the root key.</p>
 			} else {
-				<ol class="path">
-					for _, st := range r.Steps {
-						<li>
-							@memberAddresses(st.Addresses)
-							<code class="fpr path-fpr">{ groupFingerprint(st.Fingerprint) }</code>
-						</li>
+				<p class="path">
+					for i, st := range r.Steps {
+						if i > 0 {
+							<span class="path-arrow" aria-label="certified">→</span>
+						}
+						if len(st.Addresses) > 0 {
+							<a href={ templ.URL(st.Addresses[0].URL) } title={ groupFingerprint(st.Fingerprint) }>{ st.Name }</a>
+						} else {
+							<span title={ groupFingerprint(st.Fingerprint) }>{ st.Name }</span>
+						}
 					}
-				</ol>
+				</p>
 			}
 		</section>
 	}

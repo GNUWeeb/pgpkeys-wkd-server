@@ -33,15 +33,13 @@ type CertRequest struct {
 
 // TrustView is what the web of trust page shows: the members whose keys
 // certified the member's keys (In, plus Others by keys not in the
-// directory), those whose keys the member's keys certified (Out), the
+// directory), those whose keys the member's keys certified (Out), and the
 // submitted certifications that wait for the member (Waiting) or that the
-// member sent (Sent), and the member's chain from the root key (Root, nil
-// when no root key is set).
+// member sent (Sent).
 type TrustView struct {
 	In, Out       []TrustLink
 	Others        int
 	Waiting, Sent []CertRequest
-	Root          *RootPath
 }
 
 // Trust shows the members linked to the member by certifications and the
@@ -58,9 +56,6 @@ templ Trust(p Page, v TrustView, f Flash) {
 				<h2 id="trust-waiting">Waiting for your approval</h2>
 				@requestTable(p, v.Waiting, "Certifying key", true)
 			</section>
-		}
-		if v.Root != nil {
-			@rootPath(v.Root)
 		}
 		<section class="trust" aria-labelledby="trust-in">
 			<h2 id="trust-in">Certified your keys</h2>
