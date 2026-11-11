@@ -95,6 +95,17 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		r.Get("/keys/{fpr}/remove", s.requireLogin(s.removeKeyForm))
 		r.Post("/keys/{fpr}/remove", s.requireLogin(s.removeKey))
 		r.Get("/trust", s.requireLogin(s.trust))
+		r.Get("/trust/certify", s.requireLogin(s.certifyForm))
+		r.Post("/trust/certify", s.requireLogin(s.certify))
+		r.Post("/trust/requests/{id}/accept", s.requireLogin(s.certRequest(func(r *http.Request, id int64, addr string) (bool, error) {
+			return s.store.AcceptCertification(r.Context(), id, addr, s.now())
+		}, "accepted")))
+		r.Post("/trust/requests/{id}/reject", s.requireLogin(s.certRequest(func(r *http.Request, id int64, addr string) (bool, error) {
+			return s.store.RejectCertification(r.Context(), id, addr)
+		}, "rejected")))
+		r.Post("/trust/requests/{id}/withdraw", s.requireLogin(s.certRequest(func(r *http.Request, id int64, addr string) (bool, error) {
+			return s.store.WithdrawCertification(r.Context(), id, addr)
+		}, "withdrawn")))
 	})
 	s.router = r
 	return s

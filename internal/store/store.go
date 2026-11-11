@@ -51,6 +51,19 @@ var migrations = []string{
 		days       INTEGER NOT NULL,
 		sent_at    INTEGER NOT NULL
 	);`,
+	`CREATE TABLE certifications (
+		id           INTEGER PRIMARY KEY,
+		fingerprint  TEXT    NOT NULL,
+		user_id      TEXT    NOT NULL,
+		signer       TEXT    NOT NULL,
+		submitted_by TEXT    NOT NULL,
+		created_at   INTEGER NOT NULL,
+		submitted_at INTEGER NOT NULL,
+		accepted_at  INTEGER,
+		packet       BLOB    NOT NULL,
+		UNIQUE (fingerprint, user_id, signer)
+	);
+	CREATE INDEX certifications_submitted_by ON certifications (submitted_by);`,
 }
 
 // Open opens or creates the database at path and brings its schema up to

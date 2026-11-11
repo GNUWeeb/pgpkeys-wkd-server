@@ -105,16 +105,22 @@ directory as %s. Open this link within %d minutes to log in:
 The link works once. If you did not ask for it, ignore this mail.
 `, addr, int(tokenTTL.Minutes()), link)
 
+	s.sendMail(addr, subject, body, "login link")
+}
+
+// sendMail sends a mail in the background; what names it in the log.
+// Wait waits for it.
+func (s *Server) sendMail(to, subject, body, what string) {
 	s.mails.Add(1)
 	go func() {
 		defer s.mails.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
 		defer cancel()
-		if err := s.mailer.Send(ctx, addr, subject, body); err != nil {
-			s.log.Error("sending login link", "address", addr, "err", err)
+		if err := s.mailer.Send(ctx, to, subject, body); err != nil {
+			s.log.Error("sending "+what, "address", to, "err", err)
 			return
 		}
-		s.log.Info("login link sent", "address", addr)
+		s.log.Info(what+" sent", "address", to)
 	}()
 }
 
