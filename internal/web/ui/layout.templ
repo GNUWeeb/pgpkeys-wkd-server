@@ -93,7 +93,7 @@ templ Layout(p Page) {
 							<span class="who" title={ p.Address }>{ p.Address }</span>
 							<form method="post" action="/logout">
 								@CSRFField(p.CSRF)
-								<button type="submit" class="btn btn-quiet">Log out</button>
+								<button type="submit" class="btn btn-danger">Log out</button>
 							</form>
 						</div>
 					</nav>
