@@ -13,6 +13,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/gravatar"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web/ui"
 )
@@ -46,6 +47,9 @@ type Options struct {
 	// RealIPHeader, when set, names the header that carries the client
 	// address behind a reverse proxy.
 	RealIPHeader string
+	// Gravatar, when not nil, fetches the photos members keep at
+	// Gravatar for their pages.
+	Gravatar *gravatar.Client
 }
 
 // Server serves the dashboard.
@@ -97,6 +101,7 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		r.Get("/trust", s.requireLogin(s.trust))
 		r.Get("/members/{address}", s.requireLogin(s.member))
 		r.Get("/members/{address}/keys.asc", s.requireLogin(s.memberKeys))
+		r.Get("/members/{address}/avatar.png", s.requireLogin(s.memberPhoto))
 		r.Get("/trust/certify", s.requireLogin(s.certifyForm))
 		r.Post("/trust/certify", s.requireLogin(s.certify))
 		r.Post("/trust/requests/{id}/accept", s.requireLogin(s.certRequest(func(r *http.Request, id int64, addr string) (bool, error) {

@@ -18,9 +18,12 @@ import (
 type MemberView struct {
 	Address string
 	// Name is the name in their User ID with the address, or the
-	// address; Initials stand in for a photo.
+	// address; Initials show where there is no photo.
 	Name     string
 	Initials string
+	// Photo, when set, serves the member's photo, a transparent pixel
+	// where they have none.
+	Photo string
 	// Self is set when members look at their own page.
 	Self bool
 	Keys []keys.Info
@@ -66,7 +69,7 @@ func Member(p Page, v MemberView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = avatar(v.Initials, "avatar-lg").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = avatar(v.Initials, v.Photo, "avatar-lg").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -77,7 +80,7 @@ func Member(p Page, v MemberView) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(v.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 30, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 33, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -90,7 +93,7 @@ func Member(p Page, v MemberView) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(v.Address)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 31, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 34, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -103,7 +106,7 @@ func Member(p Page, v MemberView) templ.Component {
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(v.Download))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 34, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 37, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -131,7 +134,7 @@ func Member(p Page, v MemberView) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(groupFingerprint(k.Fingerprint))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 55, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 58, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -152,7 +155,7 @@ func Member(p Page, v MemberView) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(k.Created.UTC().Format(time.RFC3339))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 59, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 62, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -165,7 +168,7 @@ func Member(p Page, v MemberView) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(date(k.Created))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 59, Col: 85}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 62, Col: 85}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -188,7 +191,7 @@ func Member(p Page, v MemberView) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(k.Expires.UTC().Format(time.RFC3339))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 64, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 67, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 					if templ_7745c5c3_Err != nil {
@@ -201,7 +204,7 @@ func Member(p Page, v MemberView) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(date(k.Expires))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 64, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 67, Col: 83}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -232,7 +235,7 @@ func Member(p Page, v MemberView) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(v.Address)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 76, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 79, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -245,7 +248,7 @@ func Member(p Page, v MemberView) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(v.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 76, Col: 134}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 79, Col: 134}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -265,8 +268,10 @@ func Member(p Page, v MemberView) templ.Component {
 	})
 }
 
-// avatar is a round badge with initials, sized by class.
-func avatar(initials, class string) templ.Component {
+// avatar is a round badge with initials, sized by class, with the photo
+// at photo, when set, laid over them: the initials show while it loads,
+// where it is a transparent pixel and where it cannot be fetched.
+func avatar(initials, photo, class string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -312,13 +317,36 @@ func avatar(initials, class string) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(initials)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 83, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 88, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span></span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if photo != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<img src=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var17 string
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(photo)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/members.templ`, Line: 90, Col: 19}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" alt=\"\" loading=\"lazy\" decoding=\"async\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

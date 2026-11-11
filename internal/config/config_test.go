@@ -15,14 +15,14 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.SMTP.Port != 587 || c.SMTP.TLS != "starttls" || c.SMTP.From != "pgp@gnuweeb.org" ||
-		c.BaseURL != "https://pgp.gnuweeb.org" || c.EmailDomain != "gnuweeb.org" {
+		c.BaseURL != "https://pgp.gnuweeb.org" || c.EmailDomain != "gnuweeb.org" || !c.Gravatar {
 		t.Errorf("defaults: %+v", c)
 	}
-	c, err = load(map[string]string{"SMTP_HOST": "h", "SMTP_TLS": "implicit", "EMAIL_DOMAIN": "Example.ORG", "BASE_URL": "http://localhost:8081/"})
+	c, err = load(map[string]string{"SMTP_HOST": "h", "SMTP_TLS": "implicit", "EMAIL_DOMAIN": "Example.ORG", "BASE_URL": "http://localhost:8081/", "GRAVATAR": "off"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.SMTP.Port != 465 || c.SMTP.From != "pgp@example.org" || c.BaseURL != "http://localhost:8081" {
+	if c.SMTP.Port != 465 || c.SMTP.From != "pgp@example.org" || c.BaseURL != "http://localhost:8081" || c.Gravatar {
 		t.Errorf("implicit TLS: %+v", c)
 	}
 }
@@ -43,6 +43,7 @@ func TestRejects(t *testing.T) {
 		"domain with @":     {map[string]string{"EMAIL_DOMAIN": "a@b"}, "EMAIL_DOMAIN"},
 		"same addresses":    {map[string]string{"WKD_ADDR": ":1", "DASHBOARD_ADDR": ":1"}, "must differ"},
 		"address sans port": {map[string]string{"WKD_ADDR": "localhost"}, "WKD_ADDR"},
+		"gravatar":          {map[string]string{"GRAVATAR": "yes"}, "GRAVATAR"},
 	} {
 		env := map[string]string{}
 		for k, v := range base {

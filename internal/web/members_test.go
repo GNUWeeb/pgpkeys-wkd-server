@@ -3,19 +3,97 @@ package web
 import (
 	"bytes"
 	"context"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/gravatar"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
+
+func TestMemberPhoto(t *testing.T) {
+	h := newHarness(t)
+	var photo bytes.Buffer
+	if err := jpeg.Encode(&photo, image.NewRGBA(image.Rect(0, 0, 64, 64)), nil); err != nil {
+		t.Fatal(err)
+	}
+	var asked atomic.Int32
+	fake := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		if r.URL.Path != "/avatar/"+gravatar.Hash("alice@gnuweeb.org") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(photo.Bytes())
+	}))
+	defer fake.Close()
+	g, err := gravatar.NewAt(fake.URL, fake.Client().Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.srv.opts.Gravatar = g
+
+	for _, addr := range []string{"alice@gnuweeb.org", "bob@gnuweeb.org"} {
+		key, _ := armoredKey(t, addr)
+		if resp, _ := h.post(h.loginAs(addr), "/keys", url.Values{"key": {key}}); resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("%s's upload: status %d", addr, resp.StatusCode)
+		}
+	}
+	c := h.loginAs("carol@gnuweeb.org")
+	if _, body := h.get(c, "/members/alice@gnuweeb.org"); !strings.Contains(body, `<img src="/members/alice@gnuweeb.org/avatar.png"`) {
+		t.Error("member page has no photo")
+	}
+	decode := func(path string) image.Image {
+		t.Helper()
+		resp, err := c.Get(h.ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "image/png" ||
+			!strings.HasPrefix(resp.Header.Get("Cache-Control"), "private, max-age=") {
+			t.Fatalf("%s: status %d, %q, %q", path, resp.StatusCode, resp.Header.Get("Content-Type"), resp.Header.Get("Cache-Control"))
+		}
+		img, err := png.Decode(resp.Body)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		return img
+	}
+	if b := decode("/members/alice@gnuweeb.org/avatar.png").Bounds(); b.Dx() != 64 {
+		t.Errorf("alice's photo is %v, want her 64x64 Gravatar", b)
+	}
+	// Bob has no Gravatar: a transparent pixel, over which his initials
+	// show.
+	if _, _, _, a := decode("/members/bob@gnuweeb.org/avatar.png").At(0, 0).RGBA(); a != 0 {
+		t.Error("the photo of a member without one is not transparent")
+	}
+	before := asked.Load()
+	if resp, _ := h.get(c, "/members/nobody@gnuweeb.org/avatar.png"); resp.StatusCode != http.StatusNotFound || asked.Load() != before {
+		t.Errorf("address without keys: status %d, Gravatar asked %d times", resp.StatusCode, asked.Load()-before)
+	}
+
+	h.srv.opts.Gravatar = nil
+	if _, body := h.get(c, "/members/alice@gnuweeb.org"); strings.Contains(body, "<img") {
+		t.Error("member page shows a photo with Gravatar off")
+	}
+	if resp, _ := h.get(c, "/members/alice@gnuweeb.org/avatar.png"); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("photo with Gravatar off: status %d", resp.StatusCode)
+	}
+}
 
 func TestMemberPage(t *testing.T) {
 	h := newHarness(t)

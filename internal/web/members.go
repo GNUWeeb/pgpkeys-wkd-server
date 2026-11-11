@@ -2,8 +2,11 @@ package web
 
 import (
 	"bytes"
+	"image"
+	"image/png"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -45,6 +48,9 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 	}
 	now := s.now()
 	v := ui.MemberView{Address: addr, Self: addr == sessionAddress(r), Download: memberURL(addr) + "/keys.asc"}
+	if s.opts.Gravatar != nil {
+		v.Photo = memberURL(addr) + "/avatar.png"
+	}
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
 		if err != nil {
@@ -58,6 +64,45 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 	p := s.page(r, v.Name)
 	p.Nav = "/trust"
 	s.render(w, r, http.StatusOK, ui.Member(p, v))
+}
+
+// blankPNG is a transparent pixel: the photo of a member who has none,
+// over which the initials show.
+var blankPNG = func() []byte {
+	var b bytes.Buffer
+	png.Encode(&b, image.NewNRGBA(image.Rect(0, 0, 1, 1)))
+	return b.Bytes()
+}()
+
+// memberPhoto serves the photo a member keeps at Gravatar, which the
+// server fetches, or a transparent pixel when there is none or Gravatar
+// cannot be asked. Addresses without keys answer 404, so that the
+// dashboard asks Gravatar about members alone.
+func (s *Server) memberPhoto(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Gravatar == nil {
+		http.NotFound(w, r)
+		return
+	}
+	addr := strings.ToLower(chi.URLParam(r, "address"))
+	stored, err := s.store.Keys(r.Context(), addr)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if len(stored) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	photo, maxAge, err := s.opts.Gravatar.Photo(r.Context(), addr)
+	if err != nil {
+		s.log.Warn("gravatar", "address", addr, "err", err)
+	}
+	if photo == nil {
+		photo = blankPNG
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age="+strconv.Itoa(int(maxAge.Seconds())))
+	w.Write(photo)
 }
 
 // memberKeys serves the keys of a member, armored, as WKD serves them:

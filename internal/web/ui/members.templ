@@ -10,9 +10,12 @@ import (
 type MemberView struct {
 	Address string
 	// Name is the name in their User ID with the address, or the
-	// address; Initials stand in for a photo.
+	// address; Initials show where there is no photo.
 	Name     string
 	Initials string
+	// Photo, when set, serves the member's photo, a transparent pixel
+	// where they have none.
+	Photo string
 	// Self is set when members look at their own page.
 	Self bool
 	Keys []keys.Info
@@ -25,7 +28,7 @@ templ Member(p Page, v MemberView) {
 	@Layout(p) {
 		<header class="page-head">
 			<div class="member-head">
-				@avatar(v.Initials, "avatar-lg")
+				@avatar(v.Initials, v.Photo, "avatar-lg")
 				<div>
 					<h1>{ v.Name }</h1>
 					<p class="muted">{ v.Address }</p>
@@ -77,9 +80,14 @@ templ Member(p Page, v MemberView) {
 	}
 }
 
-// avatar is a round badge with initials, sized by class.
-templ avatar(initials, class string) {
+// avatar is a round badge with initials, sized by class, with the photo
+// at photo, when set, laid over them: the initials show while it loads,
+// where it is a transparent pixel and where it cannot be fetched.
+templ avatar(initials, photo, class string) {
 	<span class={ "avatar", class } aria-hidden="true">
 		<span class="avatar-initials">{ initials }</span>
+		if photo != "" {
+			<img src={ photo } alt="" loading="lazy" decoding="async"/>
+		}
 	</span>
 }
