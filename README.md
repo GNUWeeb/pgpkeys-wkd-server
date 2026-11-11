@@ -107,6 +107,8 @@ matcha checks every key when it starts and then daily, and mails the member 30, 
 
 Under each User ID, the key list names the members whose keys certified it, by the addresses those keys are stored for (the tooltip gives the certifying key and the date; each address links to the keys WKD serves for it), and counts certifications by keys that are not in the directory. Only certifications that verify against a stored key, use an accepted hash, have not expired and were not revoked count. They are shown for information: a key is published whether or not anyone certified it, and WKD serves keys without them.
 
+The **Web of trust** page lists the members linked to you by certifications, in two tables: the members whose keys certified yours, and the members whose keys yours certified, each with the key, the certified User IDs and the date of the latest certification. It shows only members linked to you, never the whole directory. A certification appears once the certified key is uploaded with it: after you certify a member's key, send it to them; they import it and upload it again.
+
 ## License
 
 GPL-2.0, see [LICENSE](LICENSE).

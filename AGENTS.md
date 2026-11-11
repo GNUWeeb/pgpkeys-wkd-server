@@ -18,7 +18,7 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 ```
 
 - **WKD listener** (`WKD_ADDR`, `wkd.NewHandler`): `GET`/`HEAD /.well-known/openpgpkey/hu/<hash>` returns the WKD views of every key stored under that hash, concatenated newest first (key creation time), as `application/octet-stream`; 404 when there is none or the hash is malformed. `?l=` is ignored. `GET /.well-known/openpgpkey/policy` is one comment line. Only the nginx in front of `gnuweeb.org` is meant to reach this listener.
-- **Dashboard listener** (`DASHBOARD_ADDR`, `web.New`, chi router): login by mailed link, then the member's keys: list (`GET /`), add (`GET /keys/new`, `POST /keys`, pasted text or a file), remove with a confirmation page (`GET`/`POST /keys/{fpr}/remove`). Static files under `/static/` sit outside the CSRF and session middleware, so they set no cookies.
+- **Dashboard listener** (`DASHBOARD_ADDR`, `web.New`, chi router): login by mailed link, then the member's keys: list (`GET /`), add (`GET /keys/new`, `POST /keys`, pasted text or a file), remove with a confirmation page (`GET`/`POST /keys/{fpr}/remove`), and the member's web of trust (`GET /trust`). Static files under `/static/` sit outside the CSRF and session middleware, so they set no cookies.
 
 `serve()` runs the servers in an `errgroup`; if one fails to listen, all are shut down and the process exits non-zero.
 
@@ -48,6 +48,8 @@ cmd/matcha/main.go: config.Load(os.Getenv) -> store.Open(DATABASE_PATH) -> web.N
 **Mail** (`internal/mail`): `net/smtp` with `SMTP_TLS` `starttls` (required, not opportunistic), `implicit` or `none`; `PLAIN` auth when a username is set. Plain-text body, CRLF, header values checked for CR/LF.
 
 **Keys in the dashboard** (`keys.go`): every handler is wrapped in `requireLogin` and takes the address from the session, never from the request, so a member sees and changes only their own keys; another member's fingerprint answers 404 like a missing one. Uploads go through `keys.Parse` with the session address; errors re-render the form with 422, a `*keys.Unusable` with its fix and commands. `keys.Describe` gives the list its fields (User IDs in key order, created, expires, expired, revoked, and the `Health` from `keys.Check`); keys with problems get a "What to fix" notice below the table. Each User ID shows the members whose keys certified it (`keys.Certifications` against every stored key, named by the addresses they are stored for, each linked to its public WKD URL; there is no dashboard page for another member's keys). Success redirects to `/?added=<fpr>` or `/?removed=<fpr>`, which shows the notice.
+
+**Web of trust page** (`trust.go`): the members whose stored keys certified the member's keys, and the members whose stored keys the member's keys certified, grouped by the other key (`ui.TrustLink`). A member's keys certifying each other are left out. It shows only members linked to the session's address; there is no view of the whole directory and no root key (maintainer decision, `ROADMAP.md`). Every request runs `keys.Certifications` over all stored keys, which is fine for a directory of this size.
 
 **Templates** (`internal/web/ui`): templ. Edit the `.templ` files, then run `go tool templ generate` and commit the generated `*_templ.go` files with them; the build does not generate. Every page works without JavaScript; htmx (`hx-boost` on `<body>`) only swaps pages in place. Its config (`htmxConfig` in `layout.templ`) disables eval and inline styles, as the CSP requires, and swaps 4xx/5xx responses so form errors show.
 
@@ -100,8 +102,8 @@ Configuration is read from the environment only; the binary does not read `.env`
 - `internal/keys/keys.go` - `Parse` and `wkdView`; `health.go` - `Check` and the policy; `certs.go` - `Certifications`; `describe.go` - `Describe`; `packets.go` splits raw packets.
 - `internal/reminder/reminder.go` - reminder thresholds, the mail text, `Loop` and `Run`.
 - `internal/store/store.go` - `Open` and the migrations; `keys.go` - key queries; `login.go` - tokens and sessions; `reminders.go` - reminder state.
-- `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `keys.go`, `session.go`, `csrf.go`, `ratelimit.go`, `assets.go`.
-- `internal/web/ui/layout.templ` - page frame (bare before login, sidebar after), htmx config; `login.templ`, `keys.templ`.
+- `internal/web/web.go` - routes, constants (lifetimes, limits), security headers; `login.go`, `keys.go`, `trust.go`, `session.go`, `csrf.go`, `ratelimit.go`, `assets.go`.
+- `internal/web/ui/layout.templ` - page frame (bare before login, sidebar after), htmx config; `login.templ`, `keys.templ`, `trust.templ`.
 - `internal/wkd/handler.go`, `hash.go` - WKD routes and hash.
 - `.env.example` - documented settings; copy to `.env` (gitignored).
 - `Dockerfile` - Go build stage, Debian slim runtime, static binary, CA bundle copied from the build stage (for SMTP TLS), non-root user (uid 10001), volume `/var/lib/matcha` for the database; base images pinned by digest.
