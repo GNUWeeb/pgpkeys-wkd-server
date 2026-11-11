@@ -58,8 +58,7 @@ Settled by the maintainer on 2026-11-11:
 ## Where We Are (observed)
 
 - Phase 1 replaced the Node service (which mirrored `GNUWeeb/pgpkeys` from GitHub into memory) with a Go skeleton; see `AGENTS.md` for the current state.
-- WKD for `gnuweeb.org` is not being served: `https://gnuweeb.org/.well-known/openpgpkey/policy` answers 302 to `https://www.gnuweeb.org/...`, which answers 404.
-- `openpgpkey.gnuweeb.org` and `pgp.gnuweeb.org` do not resolve.
+- Live since 2026-11-11 (checked from an outside machine): `https://gnuweeb.org/.well-known/openpgpkey/policy` answers matcha's policy line, `pgp.gnuweeb.org` serves the dashboard, and `openpgpkey.gnuweeb.org` does not resolve, so clients use the direct method.
 - `GNUWeeb/pgpkeys` also exists on `git.gnuweeb.net` (imported 2026-06-16). It holds `keys/<FINGERPRINT>.asc`, a generated `map.txt` and `genmap.py`; members add keys by pull request.
 - The GitHub workflows were deleted in phase 1; there is no `.gitlab-ci.yml`.
 
@@ -131,7 +130,7 @@ The store keeps each key as submitted, including third-party certifications (nee
 
 Each phase is merged on its own and leaves the tree building. `AGENTS.md` and `README.md` are updated in the phase that makes them wrong. Phases 1 to 5 deliver the handover; 6 to 9 are the kernel.org-style additions.
 
-Current scope (maintainer, 2026-11-11): phases 6, 7 and 9, after phases 1 to 5. Deferred by the maintainer on 2026-11-11: the production part of phase 5 and all of phase 8.
+Current scope (maintainer, 2026-11-11): phases 6, 7 and 9, after phases 1 to 5. Deferred by the maintainer on 2026-11-11: all of phase 8. The production part of phase 5, deferred at first, was done by the owner the same day.
 
 ### 1. Tooling and rename
 
@@ -190,7 +189,7 @@ Status: done 2026-11-11. In headless Chromium against a local instance (mail thr
 
 Done when: a member uploads a key and `gpg --locate-key <member>@gnuweeb.org` returns it from an outside machine.
 
-Status: the repository's part is done 2026-11-11; the production part is not. In the repository: `compose.yaml`, example nginx server blocks in `deploy/nginx/`, and a deployment section in `README.md`. Checked with `podman compose` and the repository's `compose.yaml` plus a test overlay (Mailpit, an nginx running the two example blocks with `gnuweeb.org` renamed to `gnuweeb.test` and a test CA): a member logged in by mailed link over STARTTLS, uploaded a key file, GnuPG 2.4.7 in a fresh `GNUPGHOME` located it through `https://gnuweeb.test/.well-known/openpgpkey/`, removing it made WKD answer 404, `POST` below the prefix got 403 and `/` the redirect to `www`. The container ran with a read-only root file system and no capabilities. Still to do on the servers, by the owner: the DNS record and certificate for `pgp.gnuweeb.org`, the nginx changes, the production `.env` with the SMTP credentials for `pgp@gnuweeb.org`, starting the service, the announcement, and the check from an outside machine named in "Done when".
+Status: done 2026-11-11. In the repository: `compose.yaml`, example nginx server blocks in `deploy/nginx/`, and a deployment section in `README.md`. Checked with `podman compose` and the repository's `compose.yaml` plus a test overlay (Mailpit, an nginx running the two example blocks with `gnuweeb.org` renamed to `gnuweeb.test` and a test CA): a member logged in by mailed link over STARTTLS, uploaded a key file, GnuPG 2.4.7 in a fresh `GNUPGHOME` located it through `https://gnuweeb.test/.well-known/openpgpkey/`, removing it made WKD answer 404, `POST` below the prefix got 403 and `/` the redirect to `www`. The container ran with a read-only root file system and no capabilities. On the servers, by the owner: the DNS record and certificate for `pgp.gnuweeb.org`, the nginx changes, the production `.env` and starting the service. Checked from an outside machine: GnuPG 2.4.9 in a fresh `GNUPGHOME` (`--auto-key-locate clear,wkd,nodefault --locate-keys`) imported a member's uploaded key from `gnuweeb.org`.
 
 ### 6. Key health and expiry reminders
 

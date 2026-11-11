@@ -4,7 +4,7 @@
 
 `matcha` (formerly `pgpkeys-wkd-server`) serves GNUWeeb members' OpenPGP public keys through Web Key Directory (WKD, direct method), so `gpg --locate-key user@gnuweeb.org` works, and gives members a dashboard at `pgp.gnuweeb.org` where they log in by mailed link and manage their own keys. License: GPL-2.0.
 
-**Status: phases 1 to 7 and 9 of `ROADMAP.md` are implemented in this repository (phase 8 is deferred); the production deployment (DNS, TLS, nginx, SMTP credentials) is pending on the servers.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
+**Status: phases 1 to 7 and 9 of `ROADMAP.md` are implemented in this repository (phase 8 is deferred); the service is live, with the dashboard at `pgp.gnuweeb.org` and WKD for `gnuweeb.org`.** `ROADMAP.md` holds the plan and the settled decisions; read it before any feature work and treat it as the authority on direction.
 
 - Do not start a roadmap phase unasked.
 - Update this file in the same change that makes any part of it wrong, and record new decisions in `ROADMAP.md`, not here.
