@@ -6,27 +6,13 @@ import (
 	"time"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
-	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web/ui"
 )
 
-// rootPaths traces the web of trust from the root key, as kernel.org
-// traces its keyring to Linus Torvalds' key: for every stored key the
-// root key reaches, the shortest chain of fingerprints from the root key
-// to it, each certifying the next on one of its User IDs (a certification
-// keys.Certifications counts). The root key's own chain is itself alone.
-// It is nil when no root key is set or the root key is not stored.
-func (s *Server) rootPaths(all []store.StoredKey, now time.Time) (map[string][]string, error) {
-	root := s.opts.RootKey
-	if root == "" {
-		return nil, nil
-	}
-	signers, _ := signersOf(all)
-	if !slices.ContainsFunc(signers, func(k keys.Signer) bool { return k.Fingerprint == root }) {
-		return nil, nil
-	}
-	// certified holds, per key, the keys it certified, in the order of
-	// signers, so that among chains of one length the same one wins.
+// certEdges returns, per stored key, the stored keys it certified on one
+// of their User IDs (a certification keys.Certifications counts), in the
+// order of signers.
+func certEdges(signers []keys.Signer, now time.Time) (map[string][]string, error) {
 	certified := map[string][]string{}
 	for _, k := range signers {
 		certs, _, err := keys.Certifications(k.Data, signers, now)
@@ -38,6 +24,20 @@ func (s *Server) rootPaths(all []store.StoredKey, now time.Time) (map[string][]s
 				certified[c.Signer] = append(certified[c.Signer], k.Fingerprint)
 			}
 		}
+	}
+	return certified, nil
+}
+
+// rootPaths traces the web of trust from the root key, as kernel.org
+// traces its keyring to Linus Torvalds' key: for every stored key the
+// root key reaches through certified (certEdges), the shortest chain of
+// fingerprints from the root key to it. Among chains of one length the
+// first in certified's order wins. The root key's own chain is itself
+// alone. It is nil when no root key is set or the root key is not stored.
+func (s *Server) rootPaths(signers []keys.Signer, certified map[string][]string) map[string][]string {
+	root := s.opts.RootKey
+	if root == "" || !slices.ContainsFunc(signers, func(k keys.Signer) bool { return k.Fingerprint == root }) {
+		return nil
 	}
 	paths := map[string][]string{root: {root}}
 	queue := []string{root}
@@ -51,7 +51,7 @@ func (s *Server) rootPaths(all []store.StoredKey, now time.Time) (map[string][]s
 			}
 		}
 	}
-	return paths, nil
+	return paths
 }
 
 // rootPathView is the shortest of the chains in paths that lead to one of
@@ -81,10 +81,10 @@ func (s *Server) rootPathOf(ctx context.Context, fprs []string) (*ui.RootPath, e
 	if err != nil {
 		return nil, err
 	}
-	paths, err := s.rootPaths(all, s.now())
+	signers, addresses := signersOf(all)
+	certified, err := certEdges(signers, s.now())
 	if err != nil {
 		return nil, err
 	}
-	_, addresses := signersOf(all)
-	return s.rootPathView(paths, addresses, fprs), nil
+	return s.rootPathView(s.rootPaths(signers, certified), addresses, fprs), nil
 }

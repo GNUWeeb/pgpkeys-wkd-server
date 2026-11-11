@@ -3,6 +3,9 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -58,14 +61,36 @@ func TestRootPaths(t *testing.T) {
 	}
 
 	_, list := h.get(c, "/members")
-	for addr, want := range map[string]string{
-		"root": "Root key", "alice": "1 step", "bob": "2 steps", "carol": "Not connected", "dave": "Not connected",
-	} {
-		row := list[strings.Index(list, `href="/members/`+addr+`@gnuweeb.org"`):]
-		row = row[:strings.Index(row, "</tr>")]
-		if !strings.Contains(row, want) {
-			t.Errorf("%s's row lacks %q", addr, want)
+	graph, _, ok := strings.Cut(list, "</svg>")
+	if !ok {
+		t.Fatal("members page has no graph")
+	}
+	// Members sit in bands by their steps from the root key: the root key's
+	// holder on top, then alice, then bob, and those not connected last.
+	rowY := func(addr string) int {
+		m := regexp.MustCompile(`href="/members/` + addr + `@gnuweeb.org"[^>]*><rect x="\d+" y="(\d+)"`).FindStringSubmatch(graph)
+		if m == nil {
+			t.Fatalf("graph has no box for %s", addr)
 		}
+		y, _ := strconv.Atoi(m[1])
+		return y
+	}
+	if ys := []int{rowY("root"), rowY("alice"), rowY("bob"), rowY("carol")}; !slices.IsSorted(ys) || ys[0] == ys[1] || ys[1] == ys[2] || ys[2] == ys[3] || rowY("dave") != ys[3] {
+		t.Errorf("graph rows: root, alice, bob, carol at %v, dave at %d", ys, rowY("dave"))
+	}
+	// Every certification between members is an arrow, whatever its
+	// direction, and the bands run from the root key down.
+	for _, edge := range []string{"root@gnuweeb.org certified alice@gnuweeb.org", "alice@gnuweeb.org certified bob@gnuweeb.org",
+		"carol@gnuweeb.org certified bob@gnuweeb.org", "dave@gnuweeb.org certified root@gnuweeb.org"} {
+		if !strings.Contains(graph, "<title>"+edge+"</title>") {
+			t.Errorf("graph lacks %q", edge)
+		}
+	}
+	if n := strings.Count(graph, `class="graph-edge"`); n != 4 {
+		t.Errorf("graph has %d arrows, want 4", n)
+	}
+	if bands := []int{strings.Index(graph, ">Root key<"), strings.Index(graph, ">1 step<"), strings.Index(graph, ">2 steps<"), strings.Index(graph, ">Not connected<")}; !slices.IsSorted(bands) || bands[0] < 0 {
+		t.Errorf("graph bands out of order: %v", bands)
 	}
 	if _, body := h.get(h.loginAs("dave@gnuweeb.org"), "/trust"); !strings.Contains(body, "Not connected.") {
 		t.Error("dave's web of trust page does not say he is not connected")
@@ -73,7 +98,7 @@ func TestRootPaths(t *testing.T) {
 
 	// A root key that is not stored connects no one.
 	h.srv.opts.RootKey = strings.Repeat("A", 40)
-	if _, list := h.get(c, "/members"); strings.Contains(list, "Root key</span>") || strings.Contains(list, "step") {
+	if _, list := h.get(c, "/members"); strings.Contains(list, ">Root key<") || strings.Contains(list, "step") {
 		t.Error("an unknown root key connects members")
 	}
 }
