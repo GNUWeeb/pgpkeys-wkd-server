@@ -107,11 +107,16 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 func (s *Server) certifiers(certs []keys.Certification, addresses map[string][]string) map[string][]ui.Certifier {
 	out := map[string][]ui.Certifier{}
 	for _, c := range certs {
-		links := make([]ui.CertifierAddress, 0, len(addresses[c.Signer]))
-		for _, a := range addresses[c.Signer] {
-			links = append(links, ui.CertifierAddress{Address: a, KeyURL: s.wkdURL(a)})
-		}
-		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: links, Created: c.Created})
+		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: s.memberAddresses(addresses[c.Signer]), Created: c.Created})
+	}
+	return out
+}
+
+// memberAddresses links each address to where WKD serves its keys.
+func (s *Server) memberAddresses(addresses []string) []ui.MemberAddress {
+	out := make([]ui.MemberAddress, 0, len(addresses))
+	for _, a := range addresses {
+		out = append(out, ui.MemberAddress{Address: a, KeyURL: s.wkdURL(a)})
 	}
 	return out
 }

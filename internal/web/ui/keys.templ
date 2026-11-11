@@ -28,16 +28,26 @@ type KeyRow struct {
 type Certifier struct {
 	Fingerprint string
 	// Addresses are the addresses the certifying key is stored for.
-	Addresses []CertifierAddress
+	Addresses []MemberAddress
 	// Created is when it made the certification.
 	Created time.Time
 }
 
-// CertifierAddress is an address a certifying key is stored for, with the
-// WKD URL that serves the keys for it.
-type CertifierAddress struct {
+// MemberAddress is an address a member's key is stored for, with the WKD
+// URL that serves the keys for it.
+type MemberAddress struct {
 	Address string
 	KeyURL  string
+}
+
+// memberAddresses links each address to the keys WKD serves for it.
+templ memberAddresses(as []MemberAddress) {
+	for i, a := range as {
+		if i > 0 {
+			,
+		}
+		<a href={ templ.URL(a.KeyURL) }>{ a.Address }</a>
+	}
 }
 
 // userIDs lists a key's User IDs, each with the members' keys that
@@ -55,12 +65,7 @@ templ userIDs(k KeyRow) {
 								,
 							}
 							<span title={ "Key " + groupFingerprint(c.Fingerprint) + ", certified " + date(c.Created) }>
-								for j, a := range c.Addresses {
-									if j > 0 {
-										,
-									}
-									<a href={ templ.URL(a.KeyURL) }>{ a.Address }</a>
-								}
+								@memberAddresses(c.Addresses)
 							</span>
 						}
 					</span>
