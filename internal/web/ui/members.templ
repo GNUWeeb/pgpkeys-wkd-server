@@ -1,0 +1,277 @@
+package ui
+
+import (
+	"strconv"
+	"time"
+
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
+)
+
+// MemberView is a member's page: who they are and their keys.
+type MemberView struct {
+	Address string
+	// Name is the name in their User ID with the address, or the
+	// address; Initials show where there is no photo.
+	Name     string
+	Initials string
+	// Photo, when set, serves the member's photo, a transparent pixel
+	// where they have none.
+	Photo string
+	Keys []keys.Info
+	// Download serves the keys, armored.
+	Download string
+	// Root is the chain of certifications from the root key, nil when no
+	// root key is set.
+	Root *RootPath
+}
+
+// RootPath is the shortest chain of certifications from the root key to
+// a member's keys: Steps start at the root key and end at the member's
+// key, each certified by the one before. No steps: no chain leads there.
+type RootPath struct {
+	Steps []PathStep
+}
+
+// PathStep is a key on a chain, with the addresses it is stored for and
+// the name in its User ID.
+type PathStep struct {
+	Fingerprint string
+	Addresses   []MemberAddress
+	Name        string
+}
+
+// MemberRow is a member in the list of members.
+type MemberRow struct {
+	Address  string
+	Name     string
+	Initials string
+	Photo    string
+	URL      string
+	// Keys counts the keys stored for the address.
+	Keys int
+	// Root is their chain from the root key, nil when no root key is set;
+	// it places them in the graph.
+	Root *RootPath
+}
+
+// Members lists the members who have keys in the directory under a graph
+// of who certified whom.
+templ Members(p Page, rows []MemberRow, g Graph) {
+	@Layout(p) {
+		<header class="page-head">
+			<h1>Members</h1>
+		</header>
+		if len(rows) == 0 {
+			<div class="empty">
+				<p class="empty-title">No members yet</p>
+			</div>
+		} else {
+			@graph(g)
+			<div class="tbl-wrap">
+				<table class="tbl">
+					<thead>
+						<tr>
+							<th scope="col">Member</th>
+							<th scope="col">Keys</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, m := range rows {
+							<tr>
+								<td>
+									<a class="member-cell" href={ templ.URL(m.URL) }>
+										@avatar(m.Initials, m.Photo, "")
+										<span>
+											<span class="member-name">{ m.Name }</span>
+											<span class="muted member-address">{ m.Address }</span>
+										</span>
+									</a>
+								</td>
+								<td>{ strconv.Itoa(m.Keys) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+// Graph is the web of trust drawn: members as boxes, certifications as
+// arrows from the certifier, and, with a root key, labels for the bands
+// of members by their steps from it. Sizes are in SVG units.
+type Graph struct {
+	Width, Height int
+	NodeW, NodeH  int
+	Bands         []GraphBand
+	Nodes         []GraphNode
+	Edges         []GraphEdge
+}
+
+// GraphBand labels a band, at X, Y above its first row.
+type GraphBand struct {
+	Label string
+	X, Y  int
+}
+
+// GraphNode is a member's box, with its top left corner at X, Y.
+type GraphNode struct {
+	X, Y          int
+	Name, Address string
+	URL           string
+	Root          bool
+	Unconnected   bool
+	// Mine is set on the viewer's own chain from the root key.
+	Mine bool
+}
+
+// GraphEdge is a certification: an SVG path from the certifier's box to
+// the certified member's, and its tooltip. Mine is set on the viewer's
+// own chain from the root key; Dead on certifications by members the root
+// key does not reach, which no chain can use.
+type GraphEdge struct {
+	D, Title string
+	Mine     bool
+	Dead     bool
+}
+
+templ graph(g Graph) {
+	<div class="graph-wrap">
+		<svg class="graph" width={ strconv.Itoa(g.Width) } height={ strconv.Itoa(g.Height) } viewBox={ "0 0 " + strconv.Itoa(g.Width) + " " + strconv.Itoa(g.Height) } role="img" aria-label="Who certified whom">
+			<defs>
+				<marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+					<path d="M0 0L10 5L0 10z" class="graph-arrowhead"></path>
+				</marker>
+				<marker id="graph-arrow-mine" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0 0L10 5L0 10z" class="graph-arrowhead mine"></path>
+				</marker>
+				<marker id="graph-dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4">
+					<circle cx="5" cy="5" r="5" class="graph-arrowhead"></circle>
+				</marker>
+				<marker id="graph-dot-mine" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3">
+					<circle cx="5" cy="5" r="5" class="graph-arrowhead mine"></circle>
+				</marker>
+			</defs>
+			for _, b := range g.Bands {
+				<text class="graph-band" x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) }>{ b.Label }</text>
+			}
+			for _, e := range g.Edges {
+				if e.Mine {
+					<path class="graph-edge mine" d={ e.D } marker-start="url(#graph-dot-mine)" marker-end="url(#graph-arrow-mine)">
+						<title>{ e.Title }</title>
+					</path>
+				} else {
+					<path class={ "graph-edge", templ.KV("dead", e.Dead) } d={ e.D } marker-start="url(#graph-dot)" marker-end="url(#graph-arrow)">
+						<title>{ e.Title }</title>
+					</path>
+				}
+			}
+			for _, n := range g.Nodes {
+				<a href={ templ.URL(n.URL) } class={ "graph-node", templ.KV("root", n.Root), templ.KV("unconnected", n.Unconnected), templ.KV("mine", n.Mine) }>
+					<rect x={ strconv.Itoa(n.X) } y={ strconv.Itoa(n.Y) } width={ strconv.Itoa(g.NodeW) } height={ strconv.Itoa(g.NodeH) } rx="8"></rect>
+					<text class="graph-name" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 19) }>{ n.Name }</text>
+					<text class="graph-address" x={ strconv.Itoa(n.X + 12) } y={ strconv.Itoa(n.Y + 35) }>{ n.Address }</text>
+				</a>
+			}
+		</svg>
+	</div>
+}
+
+// rootPath shows the chain from the root key to a member's keys on one
+// line, by name, each key certified by the one before it. The root key's
+// holder has none.
+templ rootPath(r *RootPath) {
+	if len(r.Steps) != 1 {
+		<section class="trust" aria-labelledby="root-path">
+			<h2 id="root-path">Path from the root key</h2>
+			if len(r.Steps) == 0 {
+				<p class="muted">No path from the root key.</p>
+			} else {
+				<p class="path">
+					for i, st := range r.Steps {
+						if i > 0 {
+							<span class="path-arrow" aria-label="certified">→</span>
+						}
+						if len(st.Addresses) > 0 {
+							<a href={ templ.URL(st.Addresses[0].URL) } title={ groupFingerprint(st.Fingerprint) }>{ st.Name }</a>
+						} else {
+							<span title={ groupFingerprint(st.Fingerprint) }>{ st.Name }</span>
+						}
+					}
+				</p>
+			}
+		</section>
+	}
+}
+
+// Member shows a member and their keys as WKD serves them.
+templ Member(p Page, v MemberView) {
+	@Layout(p) {
+		<header class="page-head">
+			<div class="member-head">
+				@avatar(v.Initials, v.Photo, "avatar-lg")
+				<div>
+					<h1>{ v.Name }</h1>
+					<p class="muted">{ v.Address }</p>
+					if v.Root != nil && len(v.Root.Steps) == 1 {
+						<span class="badge ok">Root key</span>
+					}
+				</div>
+			</div>
+			<a class="btn" href={ templ.URL(v.Download) } hx-boost="false" download>Download keys</a>
+		</header>
+		if v.Root != nil {
+			@rootPath(v.Root)
+		}
+		<section class="trust" aria-labelledby="member-keys">
+			<h2 id="member-keys">Keys</h2>
+			<div class="tbl-wrap">
+				<table class="tbl">
+					<thead>
+						<tr>
+							<th scope="col">Key</th>
+							<th scope="col">User IDs</th>
+							<th scope="col">Created</th>
+							<th scope="col">Expires</th>
+							<th scope="col">Status</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, k := range v.Keys {
+							<tr>
+								<td><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></td>
+								<td>
+									@userIDs(k.UserIDs)
+								</td>
+								<td><time datetime={ k.Created.UTC().Format(time.RFC3339) }>{ date(k.Created) }</time></td>
+								<td>
+									if k.Expires.IsZero() {
+										<span class="muted">Never</span>
+									} else {
+										<time datetime={ k.Expires.UTC().Format(time.RFC3339) }>{ date(k.Expires) }</time>
+									}
+								</td>
+								<td>
+									@keyStatus(k)
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<p class="muted">Fetch these keys with <code>gpg --locate-keys { v.Address }</code>.</p>
+	}
+}
+
+// avatar is a round badge with initials, sized by class, with the photo
+// at photo, when set, laid over them: the initials show while it loads,
+// where it is a transparent pixel and where it cannot be fetched.
+templ avatar(initials, photo, class string) {
+	<span class={ "avatar", class } aria-hidden="true">
+		<span class="avatar-initials">{ initials }</span>
+		if photo != "" {
+			<img src={ photo } alt="" loading="lazy" decoding="async"/>
+		}
+	</span>
+}

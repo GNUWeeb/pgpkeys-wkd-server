@@ -1,0 +1,60 @@
+package ui
+
+// Login is the form that asks for the member's address. errText, when
+// set, says what was wrong with the last attempt.
+templ Login(p Page, domain, address, errText string) {
+	@Layout(p) {
+		<section class="card">
+			<h1>Log in</h1>
+			<p>We mail a login link to your { "@" + domain } address.</p>
+			if errText != "" {
+				<div class="flash danger" role="alert">{ errText }</div>
+			}
+			<form method="post" action="/login" class="stack">
+				@CSRFField(p.CSRF)
+				<label class="field">
+					<span>Address</span>
+					<input
+						type="email"
+						name="address"
+						value={ address }
+						placeholder={ "you@" + domain }
+						autocomplete="email"
+						required
+						autofocus
+					/>
+				</label>
+				<button type="submit" class="btn btn-primary">Mail me a link</button>
+			</form>
+		</section>
+	}
+}
+
+// CheckMail is the answer to every accepted login request, whether or
+// not the address exists, so the page reveals nothing about it.
+templ CheckMail(p Page, address string, minutes int) {
+	@Layout(p) {
+		<section class="card">
+			<h1>Check your mail</h1>
+			<p>A login link is on its way to { address }. It works once, for { minutes } minutes.</p>
+			<p class="muted">Nothing? Check spam, or <a href="/login">ask again</a>.</p>
+		</section>
+	}
+}
+
+// Confirm is where a mailed link lands. Logging in takes a press of the
+// button (a POST), so a mail scanner that opens the link does not use
+// it up.
+templ Confirm(p Page, token, address string) {
+	@Layout(p) {
+		<section class="card">
+			<h1>Log in</h1>
+			<p>Log in as <b>{ address }</b>?</p>
+			<form method="post" action="/login/confirm">
+				@CSRFField(p.CSRF)
+				<input type="hidden" name="token" value={ token }/>
+				<button type="submit" class="btn btn-primary">Log in</button>
+			</form>
+		</section>
+	}
+}
