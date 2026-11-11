@@ -564,6 +564,38 @@ main:focus {
 	color: var(--danger);
 }
 
+/* The chain of certifications from the root key to a member, one key a
+   line, each after an arrow from the key that certified it. */
+
+.path {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.path li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 var(--space-2);
+}
+
+.path li + li::before {
+	content: "\2192";
+	color: var(--muted);
+}
+
+.path .path-fpr {
+	flex-basis: 100%;
+	padding: 0;
+	background: none;
+	font-size: var(--text-xs);
+	color: var(--muted);
+}
+
 .flash > :last-child {
 	margin-bottom: 0;
 }

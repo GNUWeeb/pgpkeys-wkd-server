@@ -99,6 +99,7 @@ func run(log *slog.Logger) error {
 		Domain:       cfg.EmailDomain,
 		BaseURL:      cfg.BaseURL,
 		RealIPHeader: cfg.RealIPHeader,
+		RootKey:      cfg.RootKey,
 	}
 	if cfg.Gravatar {
 		opts.Gravatar = gravatar.New()

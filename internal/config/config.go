@@ -34,6 +34,10 @@ type Config struct {
 	// Gravatar has the dashboard show the photos members keep at
 	// Gravatar, fetched by the server. On unless GRAVATAR is off.
 	Gravatar bool
+	// RootKey is the fingerprint, upper-case hex, of the key the web of
+	// trust is traced to, as kernel.org traces it to Linus Torvalds' key.
+	// Empty: no trust paths are shown.
+	RootKey string
 	// SMTP is the mail server and sender of the login mails.
 	SMTP mail.Config
 }
@@ -62,6 +66,10 @@ func Load(getenv func(string) string) (Config, error) {
 		c.Gravatar = g == "on"
 	default:
 		return Config{}, fmt.Errorf("GRAVATAR: %q is not on or off", g)
+	}
+	c.RootKey = strings.ToUpper(strings.ReplaceAll(getenv("ROOT_KEY"), " ", ""))
+	if c.RootKey != "" && !isFingerprint(c.RootKey) {
+		return Config{}, fmt.Errorf("ROOT_KEY: %q is not a key fingerprint", getenv("ROOT_KEY"))
 	}
 	for name, addr := range map[string]string{"WKD_ADDR": c.WKDAddr, "DASHBOARD_ADDR": c.DashboardAddr} {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
@@ -114,4 +122,18 @@ func envOr(getenv func(string) string, name, def string) string {
 // need the database, such as the keyring export, read it alone.
 func DatabasePath(getenv func(string) string) string {
 	return envOr(getenv, "DATABASE_PATH", "matcha.db")
+}
+
+// isFingerprint accepts upper-case hex of a v4 (40 digits) or v6 (64)
+// fingerprint.
+func isFingerprint(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !('0' <= c && c <= '9' || 'A' <= c && c <= 'F') {
+			return false
+		}
+	}
+	return true
 }

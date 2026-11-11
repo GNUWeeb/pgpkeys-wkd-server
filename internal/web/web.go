@@ -50,6 +50,9 @@ type Options struct {
 	// Gravatar, when not nil, fetches the photos members keep at
 	// Gravatar for their pages.
 	Gravatar *gravatar.Client
+	// RootKey, when set, is the fingerprint of the key the web of trust
+	// is traced to: member pages show the chain of certifications from it.
+	RootKey string
 }
 
 // Server serves the dashboard.

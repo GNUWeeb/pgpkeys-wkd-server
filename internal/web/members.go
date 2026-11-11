@@ -50,6 +50,7 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 	}
 	now := s.now()
 	v := ui.MemberView{Address: addr, Self: addr == sessionAddress(r), Download: memberURL(addr) + "/keys.asc", Photo: s.photoURL(addr)}
+	fprs := make([]string, 0, len(stored))
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
 		if err != nil {
@@ -57,6 +58,11 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		v.Keys = append(v.Keys, info)
+		fprs = append(fprs, k.Fingerprint)
+	}
+	if v.Root, err = s.rootPathOf(r.Context(), fprs); err != nil {
+		s.internalError(w, r, err)
+		return
 	}
 	v.Name = displayName(v.Keys, addr)
 	v.Initials = initials(v.Name)
@@ -83,6 +89,12 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.now()
+	paths, err := s.rootPaths(all, now)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	_, addresses := signersOf(all)
 	byAddress := map[string][]keys.Info{}
 	var order []string
 	for _, k := range all {
@@ -99,17 +111,25 @@ func (s *Server) members(w http.ResponseWriter, r *http.Request) {
 	rows := make([]ui.MemberRow, 0, len(order))
 	for _, addr := range order {
 		name := displayName(byAddress[addr], addr)
-		rows = append(rows, ui.MemberRow{
+		row := ui.MemberRow{
 			Address: addr, Name: name, Initials: initials(name), URL: memberURL(addr),
 			Photo: s.photoURL(addr), Keys: len(byAddress[addr]),
-		})
+		}
+		if s.opts.RootKey != "" {
+			fprs := make([]string, 0, len(byAddress[addr]))
+			for _, k := range byAddress[addr] {
+				fprs = append(fprs, k.Fingerprint)
+			}
+			row.Root = s.rootPathView(paths, addresses, fprs)
+		}
+		rows = append(rows, row)
 	}
 	slices.SortStableFunc(rows, func(a, b ui.MemberRow) int {
 		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Address, b.Address))
 	})
 	p := s.page(r, "Members")
 	p.Nav = "/members"
-	s.render(w, r, http.StatusOK, ui.Members(p, rows))
+	s.render(w, r, http.StatusOK, ui.Members(p, rows, s.opts.RootKey != ""))
 }
 
 // blankPNG is a transparent pixel: the photo of a member who has none,
