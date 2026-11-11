@@ -127,21 +127,29 @@ type GraphNode struct {
 
 // GraphEdge is a certification: an SVG path from the certifier's box to
 // the certified member's, and its tooltip. Mine is set on the viewer's
-// own chain from the root key.
+// own chain from the root key; Dead on certifications by members the root
+// key does not reach, which no chain can use.
 type GraphEdge struct {
 	D, Title string
 	Mine     bool
+	Dead     bool
 }
 
 templ graph(g Graph) {
 	<div class="graph-wrap">
 		<svg class="graph" width={ strconv.Itoa(g.Width) } height={ strconv.Itoa(g.Height) } viewBox={ "0 0 " + strconv.Itoa(g.Width) + " " + strconv.Itoa(g.Height) } role="img" aria-label="Who certified whom">
 			<defs>
-				<marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+				<marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
 					<path d="M0 0L10 5L0 10z" class="graph-arrowhead"></path>
 				</marker>
 				<marker id="graph-arrow-mine" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 					<path d="M0 0L10 5L0 10z" class="graph-arrowhead mine"></path>
+				</marker>
+				<marker id="graph-dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4">
+					<circle cx="5" cy="5" r="5" class="graph-arrowhead"></circle>
+				</marker>
+				<marker id="graph-dot-mine" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3">
+					<circle cx="5" cy="5" r="5" class="graph-arrowhead mine"></circle>
 				</marker>
 			</defs>
 			for _, b := range g.Bands {
@@ -149,11 +157,11 @@ templ graph(g Graph) {
 			}
 			for _, e := range g.Edges {
 				if e.Mine {
-					<path class="graph-edge mine" d={ e.D } marker-end="url(#graph-arrow-mine)">
+					<path class="graph-edge mine" d={ e.D } marker-start="url(#graph-dot-mine)" marker-end="url(#graph-arrow-mine)">
 						<title>{ e.Title }</title>
 					</path>
 				} else {
-					<path class="graph-edge" d={ e.D } marker-end="url(#graph-arrow)">
+					<path class={ "graph-edge", templ.KV("dead", e.Dead) } d={ e.D } marker-start="url(#graph-dot)" marker-end="url(#graph-arrow)">
 						<title>{ e.Title }</title>
 					</path>
 				}

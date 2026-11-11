@@ -89,6 +89,14 @@ func TestRootPaths(t *testing.T) {
 	if n := strings.Count(graph, `class="graph-edge`); n != 4 {
 		t.Errorf("graph has %d arrows, want 4", n)
 	}
+	// Carol and dave have no path, so their certifications are dashed.
+	var dead []string
+	for _, m := range regexp.MustCompile(`class="graph-edge dead"[^>]*>\s*<title>([^<]*)</title>`).FindAllStringSubmatch(graph, -1) {
+		dead = append(dead, m[1])
+	}
+	if want := []string{"carol@gnuweeb.org certified bob@gnuweeb.org", "dave@gnuweeb.org certified root@gnuweeb.org"}; !slices.Equal(dead, want) {
+		t.Errorf("dashed arrows: %v, want %v", dead, want)
+	}
 	// Bob, looking, sees his own chain highlighted: root to alice to bob.
 	var mine []string
 	for _, m := range regexp.MustCompile(`class="graph-edge mine"[^>]*>\s*<title>([^<]*)</title>`).FindAllStringSubmatch(graph, -1) {
