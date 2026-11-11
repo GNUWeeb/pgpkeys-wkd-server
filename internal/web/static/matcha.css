@@ -501,14 +501,16 @@ main:focus {
 	margin-bottom: 0;
 }
 
-/* What to fix: one notice per key with its problems and the commands
-   that fix them. */
+/* Sections under the page head: What to fix (one notice per key with its
+   problems and the commands that fix them) and the web of trust. */
 
-.fixes {
+.fixes,
+.trust {
 	margin: 0 0 var(--block-gap);
 }
 
-.fixes h2 {
+.fixes h2,
+.trust h2 {
 	margin: 0 0 var(--space-3);
 	font-size: var(--text-md);
 	font-weight: 650;
