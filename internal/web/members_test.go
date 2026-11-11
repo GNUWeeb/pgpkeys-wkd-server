@@ -114,6 +114,12 @@ func TestMemberPage(t *testing.T) {
 	}
 	bob := h.loginAs("bob@gnuweeb.org")
 
+	// The list names Alice, who has a key, and not Bob, who has none.
+	_, list := h.get(bob, "/members")
+	if !strings.Contains(list, `href="/members/alice@gnuweeb.org"`) || !strings.Contains(list, "Alice Liddell") || strings.Contains(list, `href="/members/bob@gnuweeb.org"`) {
+		t.Error("members list does not show alice alone")
+	}
+
 	resp, body := h.get(bob, "/members/alice@gnuweeb.org")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("member page: status %d", resp.StatusCode)

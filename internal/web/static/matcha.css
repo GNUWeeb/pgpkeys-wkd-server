@@ -368,7 +368,7 @@ main:focus {
 	margin: 0;
 }
 
-/* A member's page: avatar beside the name. */
+/* Members: avatar beside the name, on a member's page and in the list. */
 
 .member-head {
 	display: flex;
@@ -378,6 +378,29 @@ main:focus {
 }
 
 .member-head h1 {
+	overflow-wrap: anywhere;
+}
+
+.member-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	color: inherit;
+	text-decoration: none;
+}
+
+.member-name {
+	display: block;
+	font-weight: 600;
+}
+
+.member-cell:hover .member-name {
+	text-decoration: underline;
+}
+
+.member-address {
+	display: block;
+	font-size: var(--text-sm);
 	overflow-wrap: anywhere;
 }
 

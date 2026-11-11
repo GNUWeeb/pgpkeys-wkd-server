@@ -99,6 +99,7 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		r.Get("/keys/{fpr}/remove", s.requireLogin(s.removeKeyForm))
 		r.Post("/keys/{fpr}/remove", s.requireLogin(s.removeKey))
 		r.Get("/trust", s.requireLogin(s.trust))
+		r.Get("/members", s.requireLogin(s.members))
 		r.Get("/members/{address}", s.requireLogin(s.member))
 		r.Get("/members/{address}/keys.asc", s.requireLogin(s.memberKeys))
 		r.Get("/members/{address}/avatar.png", s.requireLogin(s.memberPhoto))

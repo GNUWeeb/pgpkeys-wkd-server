@@ -2,10 +2,12 @@ package web
 
 import (
 	"bytes"
+	"cmp"
 	"image"
 	"image/png"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -43,14 +45,11 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(stored) == 0 {
-		s.message(w, r, http.StatusNotFound, "Member not found", "No keys are stored for this address.", "/trust", "Back to the web of trust")
+		s.message(w, r, http.StatusNotFound, "Member not found", "No keys are stored for this address.", "/members", "Back to the members")
 		return
 	}
 	now := s.now()
-	v := ui.MemberView{Address: addr, Self: addr == sessionAddress(r), Download: memberURL(addr) + "/keys.asc"}
-	if s.opts.Gravatar != nil {
-		v.Photo = memberURL(addr) + "/avatar.png"
-	}
+	v := ui.MemberView{Address: addr, Self: addr == sessionAddress(r), Download: memberURL(addr) + "/keys.asc", Photo: s.photoURL(addr)}
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
 		if err != nil {
@@ -62,8 +61,55 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) {
 	v.Name = displayName(v.Keys, addr)
 	v.Initials = initials(v.Name)
 	p := s.page(r, v.Name)
-	p.Nav = "/trust"
+	p.Nav = "/members"
 	s.render(w, r, http.StatusOK, ui.Member(p, v))
+}
+
+// photoURL serves the photo of the member with address, or is empty
+// when photos are off.
+func (s *Server) photoURL(address string) string {
+	if s.opts.Gravatar == nil {
+		return ""
+	}
+	return memberURL(address) + "/avatar.png"
+}
+
+// members lists every member who has keys stored, by name, each linked
+// to their page.
+func (s *Server) members(w http.ResponseWriter, r *http.Request) {
+	all, err := s.store.AllKeys(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	now := s.now()
+	byAddress := map[string][]keys.Info{}
+	var order []string
+	for _, k := range all {
+		info, err := keys.Describe(k.Data, now)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if _, ok := byAddress[k.Address]; !ok {
+			order = append(order, k.Address)
+		}
+		byAddress[k.Address] = append(byAddress[k.Address], info)
+	}
+	rows := make([]ui.MemberRow, 0, len(order))
+	for _, addr := range order {
+		name := displayName(byAddress[addr], addr)
+		rows = append(rows, ui.MemberRow{
+			Address: addr, Name: name, Initials: initials(name), URL: memberURL(addr),
+			Photo: s.photoURL(addr), Keys: len(byAddress[addr]),
+		})
+	}
+	slices.SortStableFunc(rows, func(a, b ui.MemberRow) int {
+		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Address, b.Address))
+	})
+	p := s.page(r, "Members")
+	p.Nav = "/members"
+	s.render(w, r, http.StatusOK, ui.Members(p, rows))
 }
 
 // blankPNG is a transparent pixel: the photo of a member who has none,
@@ -119,7 +165,7 @@ func (s *Server) memberKeys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(views) == 0 {
-		s.message(w, r, http.StatusNotFound, "Member not found", "No keys are stored for this address.", "/trust", "Back to the web of trust")
+		s.message(w, r, http.StatusNotFound, "Member not found", "No keys are stored for this address.", "/members", "Back to the members")
 		return
 	}
 	var b bytes.Buffer

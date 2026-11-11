@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"time"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
@@ -21,6 +22,62 @@ type MemberView struct {
 	Keys []keys.Info
 	// Download serves the keys, armored.
 	Download string
+}
+
+// MemberRow is a member in the list of members.
+type MemberRow struct {
+	Address  string
+	Name     string
+	Initials string
+	Photo    string
+	URL      string
+	// Keys counts the keys stored for the address.
+	Keys int
+}
+
+// Members lists the members who have keys in the directory.
+templ Members(p Page, rows []MemberRow) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Members</h1>
+				<p class="muted">Everyone whose keys Web Key Directory serves. Open a member for their keys.</p>
+			</div>
+		</header>
+		if len(rows) == 0 {
+			<div class="empty">
+				<p class="empty-title">No members yet</p>
+				<p>Members appear here once they add a key.</p>
+			</div>
+		} else {
+			<div class="tbl-wrap">
+				<table class="tbl">
+					<thead>
+						<tr>
+							<th scope="col">Member</th>
+							<th scope="col">Keys</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, m := range rows {
+							<tr>
+								<td>
+									<a class="member-cell" href={ templ.URL(m.URL) }>
+										@avatar(m.Initials, m.Photo, "")
+										<span>
+											<span class="member-name">{ m.Name }</span>
+											<span class="muted member-address">{ m.Address }</span>
+										</span>
+									</a>
+								</td>
+								<td>{ strconv.Itoa(m.Keys) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
 }
 
 // Member shows a member and their keys as WKD serves them.
