@@ -80,7 +80,8 @@ func TestKeyListShowsCertifiers(t *testing.T) {
 		t.Fatalf("alice's upload: status %d", resp.StatusCode)
 	}
 	_, body := h.get(aliceClient, "/")
-	for _, want := range []string{"Certified by", "bob@gnuweeb.org", "Also certified by 1 key not in this directory"} {
+	bobKeys := `href="https://gnuweeb.org/.well-known/openpgpkey/hu/` + wkd.Hash("bob") + `?l=bob"`
+	for _, want := range []string{"Certified by", "bob@gnuweeb.org", bobKeys, "Also certified by 1 key not in this directory"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("alice's list lacks %q", want)
 		}

@@ -28,9 +28,16 @@ type KeyRow struct {
 type Certifier struct {
 	Fingerprint string
 	// Addresses are the addresses the certifying key is stored for.
-	Addresses []string
+	Addresses []CertifierAddress
 	// Created is when it made the certification.
 	Created time.Time
+}
+
+// CertifierAddress is an address a certifying key is stored for, with the
+// WKD URL that serves the keys for it.
+type CertifierAddress struct {
+	Address string
+	KeyURL  string
 }
 
 // userIDs lists a key's User IDs, each with the members' keys that
@@ -47,7 +54,14 @@ templ userIDs(k KeyRow) {
 							if i > 0 {
 								,
 							}
-							<span title={ "Key " + groupFingerprint(c.Fingerprint) + ", certified " + date(c.Created) }>{ strings.Join(c.Addresses, ", ") }</span>
+							<span title={ "Key " + groupFingerprint(c.Fingerprint) + ", certified " + date(c.Created) }>
+								for j, a := range c.Addresses {
+									if j > 0 {
+										,
+									}
+									<a href={ templ.URL(a.KeyURL) }>{ a.Address }</a>
+								}
+							</span>
 						}
 					</span>
 				}

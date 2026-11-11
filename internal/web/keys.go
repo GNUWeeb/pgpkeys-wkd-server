@@ -64,7 +64,7 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 			s.internalError(w, r, err)
 			return
 		}
-		list = append(list, ui.KeyRow{Info: info, Certifiers: certifiers(certs, addresses), Others: others})
+		list = append(list, ui.KeyRow{Info: info, Certifiers: s.certifiers(certs, addresses), Others: others})
 	}
 
 	var f ui.Flash
@@ -103,11 +103,15 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 }
 
 // certifiers groups certs by the User ID they certify and names each
-// certifying key by its addresses.
-func certifiers(certs []keys.Certification, addresses map[string][]string) map[string][]ui.Certifier {
+// certifying key by its addresses, linked to where WKD serves them.
+func (s *Server) certifiers(certs []keys.Certification, addresses map[string][]string) map[string][]ui.Certifier {
 	out := map[string][]ui.Certifier{}
 	for _, c := range certs {
-		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: addresses[c.Signer], Created: c.Created})
+		links := make([]ui.CertifierAddress, 0, len(addresses[c.Signer]))
+		for _, a := range addresses[c.Signer] {
+			links = append(links, ui.CertifierAddress{Address: a, KeyURL: s.wkdURL(a)})
+		}
+		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: links, Created: c.Created})
 	}
 	return out
 }
