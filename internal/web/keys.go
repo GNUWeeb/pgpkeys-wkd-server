@@ -33,7 +33,7 @@ func validFingerprint(s string) bool {
 	return true
 }
 
-// wkdURL is where clients fetch the member's keys; shown for reference.
+// wkdURL is where clients fetch the keys for address.
 func (s *Server) wkdURL(address string) string {
 	local, domain, _ := strings.Cut(address, "@")
 	return "https://" + domain + "/.well-known/openpgpkey/hu/" + wkd.Hash(local) + "?l=" + url.QueryEscape(local)
@@ -76,7 +76,7 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 	}
 	p := s.page(r, "Your keys")
 	p.Nav = "/"
-	s.render(w, r, http.StatusOK, ui.Keys(p, list, f, s.wkdURL(addr)))
+	s.render(w, r, http.StatusOK, ui.Keys(p, list, f, addr))
 }
 
 // signers returns every stored key as a possible certifier, once per

@@ -154,7 +154,7 @@ func anyProblems(list []KeyRow) bool {
 }
 
 // Keys lists the member's keys, newest first, as WKD serves them.
-templ Keys(p Page, list []KeyRow, f Flash, wkdURL string) {
+templ Keys(p Page, list []KeyRow, f Flash, address string) {
 	@Layout(p) {
 		<header class="page-head">
 			<div>
@@ -212,7 +212,7 @@ templ Keys(p Page, list []KeyRow, f Flash, wkdURL string) {
 			if anyProblems(list) {
 				@fixes(list)
 			}
-			<p class="muted">Clients fetch these keys from <code>{ wkdURL }</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies; a reminder comes by mail 30, 10 and 3 days before that ends.</p>
+			<p class="muted">Check with <code>gpg --locate-keys { address }</code>. A reminder comes by mail before a key stops signing.</p>
 		}
 	}
 }

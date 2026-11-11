@@ -512,7 +512,7 @@ func anyProblems(list []KeyRow) bool {
 }
 
 // Keys lists the member's keys, newest first, as WKD serves them.
-func Keys(p Page, list []KeyRow, f Flash, wkdURL string) templ.Component {
+func Keys(p Page, list []KeyRow, f Flash, address string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -718,12 +718,12 @@ func Keys(p Page, list []KeyRow, f Flash, wkdURL string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, " <p class=\"muted\">Clients fetch these keys from <code>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, " <p class=\"muted\">Check with <code>gpg --locate-keys ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var30 string
-				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(wkdURL)
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(address)
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/keys.templ`, Line: 215, Col: 64}
 				}
@@ -731,7 +731,7 @@ func Keys(p Page, list []KeyRow, f Flash, wkdURL string) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</code>. Certifications by other keys are kept here but not published there. A key counts as usable while one of its keys may sign under the rules kernel.org applies; a reminder comes by mail 30, 10 and 3 days before that ends.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</code>. A reminder comes by mail before a key stops signing.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
