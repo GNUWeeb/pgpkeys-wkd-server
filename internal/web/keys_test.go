@@ -256,7 +256,7 @@ func TestKeyPagesNeedLogin(t *testing.T) {
 func TestStaticAssets(t *testing.T) {
 	h := newHarness(t)
 	_, page := h.get(h.client, "/login")
-	for _, name := range []string{"matcha.css", "htmx.min.js", "inter.woff2"} {
+	for _, name := range []string{"matcha.css", "htmx.min.js", "matcha.js", "inter.woff2"} {
 		u := h.srv.assets.url(name)
 		if !strings.Contains(page, u) {
 			t.Errorf("login page does not reference %s", u)

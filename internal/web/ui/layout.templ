@@ -49,6 +49,7 @@ templ Layout(p Page) {
 			<link rel="icon" href={ p.Asset("favicon.svg") } type="image/svg+xml"/>
 			<link rel="stylesheet" href={ p.Asset("matcha.css") }/>
 			<script src={ p.Asset("htmx.min.js") } defer></script>
+			<script src={ p.Asset("matcha.js") } defer></script>
 		</head>
 		<body hx-boost="true">
 			<a class="skip" href="#main">Skip to content</a>
@@ -113,6 +114,12 @@ templ brand() {
 // CSRFField is the hidden field that carries the CSRF token in a form.
 templ CSRFField(token string) {
 	<input type="hidden" name="csrf_token" value={ token }/>
+}
+
+// copyButton copies text to the clipboard (matcha.js). It shows only where
+// the script can copy, so the text must also be on the page.
+templ copyButton(text, label string) {
+	<button type="button" class="btn" data-copy={ text } title={ text }>{ label }</button>
 }
 
 // Message is a page that only says something: an error, or a notice

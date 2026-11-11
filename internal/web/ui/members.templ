@@ -218,7 +218,10 @@ templ Member(p Page, v MemberView) {
 					}
 				</div>
 			</div>
-			<a class="btn" href={ templ.URL(v.Download) } hx-boost="false" download>Download keys</a>
+			<div class="actions">
+				@copyButton("gpg --locate-keys "+v.Address, "Download via gpg")
+				<a class="btn" href={ templ.URL(v.Download) } hx-boost="false" download>Download keys</a>
+			</div>
 		</header>
 		if v.Root != nil {
 			@rootPath(v.Root)
@@ -260,7 +263,7 @@ templ Member(p Page, v MemberView) {
 				</table>
 			</div>
 		</section>
-		<p class="muted">Fetch these keys with <code>gpg --locate-keys { v.Address }</code>.</p>
+		<p class="muted copy-fallback">Fetch these keys with <code>gpg --locate-keys { v.Address }</code>.</p>
 	}
 }
 
