@@ -105,6 +105,7 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		r.Get("/members", s.requireLogin(s.members))
 		r.Get("/members/{address}", s.requireLogin(s.member))
 		r.Get("/members/{address}/keys.asc", s.requireLogin(s.memberKeys))
+		r.Get("/members/{address}/sign", s.requireLogin(s.signForm))
 		r.Get("/members/{address}/avatar.png", s.requireLogin(s.memberPhoto))
 		r.Get("/trust/certify", s.requireLogin(s.certifyForm))
 		r.Post("/trust/certify", s.requireLogin(s.certify))

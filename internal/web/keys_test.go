@@ -239,7 +239,7 @@ func TestMembersSeeOnlyTheirOwnKeys(t *testing.T) {
 func TestKeyPagesNeedLogin(t *testing.T) {
 	h := newHarness(t)
 	c := h.newClient()
-	for _, path := range []string{"/", "/keys/new", "/keys/" + strings.Repeat("A", 40) + "/remove", "/trust", "/trust/certify", "/members", "/members/alice@gnuweeb.org", "/members/alice@gnuweeb.org/keys.asc"} {
+	for _, path := range []string{"/", "/keys/new", "/keys/" + strings.Repeat("A", 40) + "/remove", "/trust", "/trust/certify", "/members", "/members/alice@gnuweeb.org", "/members/alice@gnuweeb.org/keys.asc", "/members/alice@gnuweeb.org/sign"} {
 		if resp, _ := h.get(c, path); resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
 			t.Errorf("GET %s: %d to %q", path, resp.StatusCode, resp.Header.Get("Location"))
 		}
@@ -256,7 +256,7 @@ func TestKeyPagesNeedLogin(t *testing.T) {
 func TestStaticAssets(t *testing.T) {
 	h := newHarness(t)
 	_, page := h.get(h.client, "/login")
-	for _, name := range []string{"matcha.css", "htmx.min.js", "inter.woff2"} {
+	for _, name := range []string{"matcha.css", "htmx.min.js", "matcha.js", "inter.woff2"} {
 		u := h.srv.assets.url(name)
 		if !strings.Contains(page, u) {
 			t.Errorf("login page does not reference %s", u)

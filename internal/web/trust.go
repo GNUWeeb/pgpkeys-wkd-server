@@ -116,9 +116,71 @@ var trustFlash = map[string]ui.Flash{
 }
 
 func (s *Server) certifyForm(w http.ResponseWriter, r *http.Request) {
+	s.renderCertify(w, r, http.StatusOK, nil, "", "")
+}
+
+// signForm is a member's "Sign this key" page: how to certify their keys
+// with GnuPG, and the form to submit them. The viewer's own address has
+// none.
+func (s *Server) signForm(w http.ResponseWriter, r *http.Request) {
+	addr := strings.ToLower(chi.URLParam(r, "address"))
+	if addr == sessionAddress(r) {
+		s.message(w, r, http.StatusBadRequest, "These are your keys", "Other members sign your keys; you sign theirs.", memberURL(addr), "Back to your page")
+		return
+	}
+	target, err := s.signTarget(r, addr)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if target == nil {
+		s.message(w, r, http.StatusNotFound, "Member not found", "No keys are stored for this address.", "/members", "Back to the members")
+		return
+	}
+	s.renderCertify(w, r, http.StatusOK, target, "", "")
+}
+
+// signTarget describes the member with address for their "Sign this key"
+// page, or is nil when no keys are stored for the address.
+func (s *Server) signTarget(r *http.Request, addr string) (*ui.SignTarget, error) {
+	stored, err := s.store.Keys(r.Context(), addr)
+	if err != nil || len(stored) == 0 {
+		return nil, err
+	}
+	own, err := s.store.Keys(r.Context(), sessionAddress(r))
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	t := &ui.SignTarget{Address: addr, URL: memberURL(addr)}
+	infos := make([]keys.Info, 0, len(stored))
+	for _, k := range stored {
+		info, err := keys.Describe(k.Data, now)
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+		if !info.Expired && !info.Revoked {
+			t.Keys = append(t.Keys, k.Fingerprint)
+		}
+	}
+	for _, k := range own {
+		t.Own = append(t.Own, k.Fingerprint)
+	}
+	t.Name = displayName(infos, addr)
+	return t, nil
+}
+
+// renderCertify renders the certification form, as a member's "Sign this
+// key" page when target is set.
+func (s *Server) renderCertify(w http.ResponseWriter, r *http.Request, status int, target *ui.SignTarget, pasted, errText string) {
 	p := s.page(r, "Submit a certification")
 	p.Nav = "/trust"
-	s.render(w, r, http.StatusOK, ui.Certify(p, "", "", keys.MaxSize>>10))
+	if target != nil {
+		p = s.page(r, "Sign "+target.Name+"'s key")
+		p.Nav = "/members"
+	}
+	s.render(w, r, status, ui.Certify(p, target, pasted, errText, keys.MaxSize>>10))
 }
 
 // certify takes the certifications the member's keys made on another
@@ -132,10 +194,19 @@ func (s *Server) certify(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	// fail answers with the form and msg, as the member's "Sign this key"
+	// page when it was sent from one.
 	fail := func(msg string) {
-		p := s.page(r, "Submit a certification")
-		p.Nav = "/trust"
-		s.render(w, r, http.StatusUnprocessableEntity, ui.Certify(p, pasted, msg, keys.MaxSize>>10))
+		var target *ui.SignTarget
+		if member := strings.ToLower(r.PostFormValue("member")); member != "" {
+			t, err := s.signTarget(r, member)
+			if err != nil {
+				s.internalError(w, r, err)
+				return
+			}
+			target = t
+		}
+		s.renderCertify(w, r, http.StatusUnprocessableEntity, target, pasted, msg)
 	}
 	if len(strings.TrimSpace(string(input))) == 0 {
 		fail("Paste a key or choose a file.")
