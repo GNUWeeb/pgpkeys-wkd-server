@@ -22,12 +22,24 @@ type StoredKey struct {
 }
 
 // PutKey stores k for address, replacing an earlier upload of the same
-// key for that address (an update, such as a new expiry date). address
-// must already be normalized; its WKD hash is derived from it here so the
-// two cannot disagree.
+// key for that address (an update, such as a new expiry date). The
+// certifications accepted for the key are added to it again, so that an
+// upload without them does not drop them. address must already be
+// normalized; its WKD hash is derived from it here so the two cannot
+// disagree.
 func (s *Store) PutKey(ctx context.Context, address string, k *keys.Key, now time.Time) error {
 	local, _, _ := strings.Cut(address, "@")
-	_, err := s.db.ExecContext(ctx, `
+	data := k.Data
+	accepted, err := acceptedFor(ctx, s.db, k.Fingerprint)
+	if err != nil {
+		return err
+	}
+	if len(accepted) > 0 {
+		if data, err = keys.AddCertifications(data, accepted); err != nil {
+			return err
+		}
+	}
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO keys (address, wkd_hash, fingerprint, created_at, uploaded_at, data, wkd)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (address, fingerprint) DO UPDATE SET
@@ -35,7 +47,7 @@ func (s *Store) PutKey(ctx context.Context, address string, k *keys.Key, now tim
 			uploaded_at = excluded.uploaded_at,
 			data = excluded.data,
 			wkd = excluded.wkd`,
-		address, wkd.Hash(local), k.Fingerprint, k.Created.Unix(), now.Unix(), k.Data, k.WKD)
+		address, wkd.Hash(local), k.Fingerprint, k.Created.Unix(), now.Unix(), data, k.WKD)
 	return err
 }
 
@@ -73,14 +85,28 @@ func (s *Store) queryKeys(ctx context.Context, query string, args ...any) ([]Sto
 }
 
 // DeleteKey removes the key with fingerprint from address and reports
-// whether there was one.
+// whether there was one. When no address keeps the key, the
+// certifications submitted for it go too.
 func (s *Store) DeleteKey(ctx context.Context, address, fingerprint string) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM keys WHERE address = ? AND fingerprint = ?`, address, fingerprint)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM keys WHERE address = ? AND fingerprint = ?`, address, fingerprint)
 	if err != nil {
 		return false, err
 	}
 	n, err := res.RowsAffected()
-	return n > 0, err
+	if err != nil || n == 0 {
+		return false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM certifications
+		WHERE fingerprint = ? AND NOT EXISTS (SELECT 1 FROM keys WHERE fingerprint = ?)`, fingerprint, fingerprint); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 // WKDKeys returns the WKD views of every key stored under the WKD hash,
