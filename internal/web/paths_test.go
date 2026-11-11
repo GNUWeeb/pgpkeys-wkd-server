@@ -59,7 +59,7 @@ func TestRootPaths(t *testing.T) {
 
 	_, list := h.get(c, "/members")
 	for addr, want := range map[string]string{
-		"root": "Root key", "alice": "Certified by it", "bob": "2 steps", "carol": "Not connected", "dave": "Not connected",
+		"root": "Root key", "alice": "1 step", "bob": "2 steps", "carol": "Not connected", "dave": "Not connected",
 	} {
 		row := list[strings.Index(list, `href="/members/`+addr+`@gnuweeb.org"`):]
 		row = row[:strings.Index(row, "</tr>")]
@@ -67,13 +67,13 @@ func TestRootPaths(t *testing.T) {
 			t.Errorf("%s's row lacks %q", addr, want)
 		}
 	}
-	if _, body := h.get(h.loginAs("dave@gnuweeb.org"), "/trust"); !strings.Contains(body, "Not connected yet") {
+	if _, body := h.get(h.loginAs("dave@gnuweeb.org"), "/trust"); !strings.Contains(body, "Not connected.") {
 		t.Error("dave's web of trust page does not say he is not connected")
 	}
 
 	// A root key that is not stored connects no one.
 	h.srv.opts.RootKey = strings.Repeat("A", 40)
-	if _, list := h.get(c, "/members"); strings.Contains(list, "Root key</span>") || strings.Contains(list, "steps") {
+	if _, list := h.get(c, "/members"); strings.Contains(list, "Root key</span>") || strings.Contains(list, "step") {
 		t.Error("an unknown root key connects members")
 	}
 }

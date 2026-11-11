@@ -53,7 +53,7 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 	var f ui.Flash
 	q := r.URL.Query()
 	if fpr := q.Get("added"); validFingerprint(fpr) {
-		f = ui.Flash{Kind: "ok", Text: "Key " + fpr + " saved. WKD serves it now."}
+		f = ui.Flash{Kind: "ok", Text: "Key " + fpr + " saved."}
 	} else if fpr := q.Get("removed"); validFingerprint(fpr) {
 		f = ui.Flash{Kind: "ok", Text: "Key " + fpr + " removed."}
 	}

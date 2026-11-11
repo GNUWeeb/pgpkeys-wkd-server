@@ -49,10 +49,7 @@ type TrustView struct {
 templ Trust(p Page, v TrustView, f Flash) {
 	@Layout(p) {
 		<header class="page-head">
-			<div>
-				<h1>Web of trust</h1>
-				<p class="muted">Members whose keys are linked to yours by certifications. Publishing a key does not depend on them.</p>
-			</div>
+			<h1>Web of trust</h1>
 			<a class="btn btn-primary" href="/trust/certify">Submit a certification</a>
 		</header>
 		@flash(f)
@@ -60,29 +57,28 @@ templ Trust(p Page, v TrustView, f Flash) {
 			<section class="trust" aria-labelledby="trust-waiting">
 				<h2 id="trust-waiting">Waiting for your approval</h2>
 				@requestTable(p, v.Waiting, "Certifying key", true)
-				<p class="certs">Accepting adds the certification to your key in this directory. Web Key Directory serves your key without it.</p>
 			</section>
 		}
 		if v.Root != nil {
-			@rootPath(v.Root, "your keys")
+			@rootPath(v.Root)
 		}
 		<section class="trust" aria-labelledby="trust-in">
 			<h2 id="trust-in">Certified your keys</h2>
 			if len(v.In) == 0 {
-				<p class="muted">No member's key has certified yours yet.</p>
+				<p class="muted">None yet.</p>
 			} else {
 				@trustTable(v.In)
 			}
 			if v.Others == 1 {
-				<p class="certs">Also certified by 1 key not in this directory</p>
+				<p class="certs">And 1 key not in this directory</p>
 			} else if v.Others > 1 {
-				<p class="certs">Also certified by { fmt.Sprint(v.Others) } keys not in this directory</p>
+				<p class="certs">And { fmt.Sprint(v.Others) } keys not in this directory</p>
 			}
 		</section>
 		<section class="trust" aria-labelledby="trust-out">
 			<h2 id="trust-out">Certified by your keys</h2>
 			if len(v.Out) == 0 {
-				<p class="muted">Your keys have not certified any member's key yet.</p>
+				<p class="muted">None yet.</p>
 			} else {
 				@trustTable(v.Out)
 			}
@@ -148,10 +144,7 @@ templ requestButton(p Page, id int64, action, label, class string) {
 templ Certify(p Page, pasted, errText string, maxKiB int) {
 	@Layout(p) {
 		<header class="page-head">
-			<div>
-				<h1>Submit a certification</h1>
-				<p class="muted">Certified another member's key with yours? Submit it here. Its owner is asked by mail and the certification is added once they accept it. Only certifications made by your own keys are taken from what you submit.</p>
-			</div>
+			<h1>Submit a certification</h1>
 		</header>
 		if errText != "" {
 			<div class="flash danger" role="alert">
@@ -161,14 +154,14 @@ templ Certify(p Page, pasted, errText string, maxKiB int) {
 		<form method="post" action="/trust/certify" enctype="multipart/form-data" class="card stack">
 			@CSRFField(p.CSRF)
 			<label class="field">
-				<span>Paste the certified key</span>
+				<span>Paste the key you certified</span>
 				<textarea name="key" rows="12" spellcheck="false" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{ pasted }</textarea>
-				<small class="muted">Check the fingerprint with its owner, certify it with <code>gpg --sign-key their@gnuweeb.org</code>, then paste the output of <code>gpg --armor --export their@gnuweeb.org</code>.</small>
+				<small class="muted">Certify it with <code>gpg --sign-key their@gnuweeb.org</code>, then export it with <code>gpg --armor --export their@gnuweeb.org</code>.</small>
 			</label>
 			<label class="field">
 				<span>Or choose a file</span>
 				<input type="file" name="file" accept=".asc,.gpg,.pgp,.key,application/pgp-keys"/>
-				<small class="muted">Armored or binary, up to { maxKiB } KiB.</small>
+				<small class="muted">Up to { maxKiB } KiB.</small>
 			</label>
 			<div class="actions">
 				<button type="submit" class="btn btn-primary">Submit</button>
