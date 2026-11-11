@@ -50,6 +50,8 @@ Settled by the maintainer on 2026-11-11:
 | Revoked keys in the export | Kept in `keys/`, so importing the keyring spreads the revocation; kernel.org removes them by hand instead (confirmed 2026-11-11). |
 | Web of trust page | Each member sees only their direct links: who certified their keys and whose keys they certified. No root key, so no trust paths, and no graph of the whole directory (decided 2026-11-11). |
 | Submitting certifications | The certifier submits the certified key in the dashboard; only certifications by the certifier's own stored keys on the key's existing User IDs are taken, and they are added only after the key's owner accepts them (decided 2026-11-11). kernel.org has no such path: certifications reach its keyring only in the owner's own export, added by hand. |
+| Member pages | Every member named in the dashboard links to a page with their name, photo and keys as WKD serves them, and a download; it does not show who certified the keys, so the web of trust stays limited to direct links. The key list no longer names certifiers per User ID (decided 2026-11-11). |
+| Photos | Gravatar, fetched by the server and served from the dashboard, as greentea does; initials where there is none; `GRAVATAR=off` turns it off (decided 2026-11-11). Uploaded photos are not done: greentea's upload, crop and storage would give matcha files on disk beside its one database. |
 
 ## Where We Are (observed)
 
@@ -221,6 +223,8 @@ Status: done 2026-11-11, without the optional graph. Under each User ID the key 
 Added 2026-11-11, after the maintainer's decision on the web of trust page: a "Web of trust" page lists, for the logged-in member, the members whose keys certified theirs and the members whose keys theirs certified. The optional graph stays out: there is no root key to draw paths to, and a graph of everyone would list every member's address to every member.
 
 Added 2026-11-11, after the maintainer's decision on submitting certifications: a member submits a key they certified under "Submit a certification"; its owner is mailed and accepts or rejects it on the Web of trust page. Not done: removing an accepted certification, and certification revocations submitted the same way; an owner's own upload still carries those. Checked: GnuPG 2.4.9 certified one member's key with another's (`--quick-sign-key`); the submission, the mail, the acceptance and the key list worked in a browser, the keyring export imported into an empty GnuPG keyring with the certification verified, and WKD served the key without it.
+
+Changed 2026-11-11, after the maintainer's review: the key list no longer names certifiers under each User ID, which grew long with several User IDs and certifiers; the web of trust page shows them once per member. Members named there link to a member page (name, Gravatar photo or initials, keys, download) instead of the raw WKD URL. Checked: the real Gravatar client fetched a known photo (PNG, 256 px) and got 404 for an address without one; in a browser, the member page showed the initials with the transparent pixel loaded, in light and dark and at 390 px without widening the page.
 
 ## Design Reference: greentea (observed)
 

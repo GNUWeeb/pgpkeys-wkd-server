@@ -24,6 +24,7 @@ import (
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/config"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/export"
+	"git.gnuweeb.net/GNUWeeb/matcha/internal/gravatar"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/mail"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/reminder"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
@@ -94,11 +95,15 @@ func run(log *slog.Logger) error {
 	defer st.Close()
 
 	mailer := mail.New(cfg.SMTP)
-	dash := web.New(web.Options{
+	opts := web.Options{
 		Domain:       cfg.EmailDomain,
 		BaseURL:      cfg.BaseURL,
 		RealIPHeader: cfg.RealIPHeader,
-	}, st, mailer, log)
+	}
+	if cfg.Gravatar {
+		opts.Gravatar = gravatar.New()
+	}
+	dash := web.New(opts, st, mailer, log)
 
 	// The daily key check mails expiry reminders until shutdown.
 	var reminders sync.WaitGroup

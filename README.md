@@ -40,6 +40,7 @@ matcha reads its settings from the environment. `.env.example` lists them with t
 | `EMAIL_DOMAIN` | `gnuweeb.org` | Mail domain whose members log in and whose keys are served |
 | `BASE_URL` | `https://pgp.gnuweeb.org` | Public URL of the dashboard; mailed login links point below it |
 | `REAL_IP_HEADER` | (none) | Header with the client address set by the reverse proxy, for the per-client rate limit |
+| `GRAVATAR` | `on` | `off` stops showing members' Gravatar photos; the server fetches them, so Gravatar learns the SHA-256 of each member address shown |
 | `SMTP_HOST` | (required) | SMTP server for login mails |
 | `SMTP_TLS` | `starttls` | `starttls`, `implicit` or `none` (local mail catcher only) |
 | `SMTP_PORT` | `587`, or `465` with `implicit` | SMTP port |
@@ -105,9 +106,9 @@ Keys are judged by the rule kernel.org applies: a key is usable while its primar
 
 matcha checks every key when it starts and then daily, and mails the member 30, 10 and 3 days before their key stops signing, with the commands that extend it. Each reminder goes out once per expiry date; uploading the key with a new date starts them over.
 
-Under each User ID, the key list names the members whose keys certified it, by the addresses those keys are stored for (the tooltip gives the certifying key and the date; each address links to the keys WKD serves for it), and counts certifications by keys that are not in the directory. Only certifications that verify against a stored key, use an accepted hash, have not expired and were not revoked count. They are shown for information: a key is published whether or not anyone certified it, and WKD serves keys without them.
+The key list shows your keys alone; who certified them is on the **Web of trust** page. That page lists the members linked to you by certifications, in two tables: the members whose keys certified yours, and the members whose keys yours certified, each with the key, the certified User IDs and the date of the latest certification. It shows only members linked to you, never the whole directory. Only certifications that verify against a stored key, use an accepted hash, have not expired and were not revoked count. They are shown for information: a key is published whether or not anyone certified it, and WKD serves keys without them.
 
-The **Web of trust** page lists the members linked to you by certifications, in two tables: the members whose keys certified yours, and the members whose keys yours certified, each with the key, the certified User IDs and the date of the latest certification. It shows only members linked to you, never the whole directory.
+Each member named there links to their page: their name and photo, their keys with dates and status as WKD serves them, the `gpg --locate-keys` command and a download of the keys. A member page does not say who certified the keys. The photo is the one the member keeps at [Gravatar](https://gravatar.com), fetched by the server and served from the dashboard, with the member's initials where there is none.
 
 To add your certification of another member's key, certify it with GnuPG (`gpg --sign-key their@gnuweeb.org`), export it (`gpg --armor --export their@gnuweeb.org`) and paste it under **Submit a certification**. matcha takes only the certifications your own keys made on that key's User IDs, and mails its owner, who accepts or rejects them on their Web of trust page; until then you can withdraw it. An accepted certification becomes part of the key in the directory and in the keyring export, and stays when the owner uploads the key again. Web Key Directory still serves the key without it.
 

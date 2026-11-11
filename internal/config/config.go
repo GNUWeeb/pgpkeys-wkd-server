@@ -31,6 +31,9 @@ type Config struct {
 	// address when the dashboard sits behind a reverse proxy (for
 	// example X-Real-IP). Empty: use the connection's address.
 	RealIPHeader string
+	// Gravatar has the dashboard show the photos members keep at
+	// Gravatar, fetched by the server. On unless GRAVATAR is off.
+	Gravatar bool
 	// SMTP is the mail server and sender of the login mails.
 	SMTP mail.Config
 }
@@ -54,6 +57,12 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	c.SMTP.From = envOr(getenv, "MAIL_FROM", "pgp@"+c.EmailDomain)
 
+	switch g := envOr(getenv, "GRAVATAR", "on"); g {
+	case "on", "off":
+		c.Gravatar = g == "on"
+	default:
+		return Config{}, fmt.Errorf("GRAVATAR: %q is not on or off", g)
+	}
 	for name, addr := range map[string]string{"WKD_ADDR": c.WKDAddr, "DASHBOARD_ADDR": c.DashboardAddr} {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
 			return Config{}, fmt.Errorf("%s: %w", name, err)

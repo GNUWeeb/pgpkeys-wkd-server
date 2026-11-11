@@ -368,6 +368,50 @@ main:focus {
 	margin: 0;
 }
 
+/* A member's page: avatar beside the name. */
+
+.member-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.member-head h1 {
+	overflow-wrap: anywhere;
+}
+
+.avatar {
+	position: relative;
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	overflow: hidden;
+	border-radius: 50%;
+	background: var(--accent-soft);
+	color: var(--accent-text);
+	font-weight: 650;
+	font-size: var(--text-sm);
+	line-height: 1;
+}
+
+.avatar-lg {
+	width: 4rem;
+	height: 4rem;
+	font-size: var(--text-xl);
+}
+
+.avatar img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
 /* Components */
 
 .card {
@@ -718,7 +762,7 @@ textarea:focus-visible {
 	margin-top: var(--space-1);
 }
 
-/* Who certified a User ID, under it. */
+/* Notes on certifications on the web of trust page. */
 .certs {
 	display: block;
 	margin: var(--space-1) 0 0;

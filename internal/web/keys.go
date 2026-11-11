@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +11,6 @@ import (
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web/ui"
-	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
 
 // Every handler here runs behind requireLogin and works only on the keys
@@ -33,12 +31,6 @@ func validFingerprint(s string) bool {
 	return true
 }
 
-// wkdURL is where clients fetch the keys for address.
-func (s *Server) wkdURL(address string) string {
-	local, domain, _ := strings.Cut(address, "@")
-	return "https://" + domain + "/.well-known/openpgpkey/hu/" + wkd.Hash(local) + "?l=" + url.QueryEscape(local)
-}
-
 func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 	addr := sessionAddress(r)
 	stored, err := s.store.Keys(r.Context(), addr)
@@ -46,25 +38,15 @@ func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	signers, addresses, err := s.signers(r)
-	if err != nil {
-		s.internalError(w, r, err)
-		return
-	}
 	now := s.now()
-	list := make([]ui.KeyRow, 0, len(stored))
+	list := make([]keys.Info, 0, len(stored))
 	for _, k := range stored {
 		info, err := keys.Describe(k.Data, now)
 		if err != nil {
 			s.internalError(w, r, err)
 			return
 		}
-		certs, others, err := keys.Certifications(k.Data, signers, now)
-		if err != nil {
-			s.internalError(w, r, err)
-			return
-		}
-		list = append(list, ui.KeyRow{Info: info, Certifiers: s.certifiers(certs, addresses), Others: others})
+		list = append(list, info)
 	}
 
 	var f ui.Flash
@@ -100,25 +82,6 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 		signers = append(signers, keys.Signer{Fingerprint: fpr, Data: k.Data})
 	}
 	return signers, addresses, nil
-}
-
-// certifiers groups certs by the User ID they certify and names each
-// certifying key by its addresses, linked to where WKD serves them.
-func (s *Server) certifiers(certs []keys.Certification, addresses map[string][]string) map[string][]ui.Certifier {
-	out := map[string][]ui.Certifier{}
-	for _, c := range certs {
-		out[c.UserID] = append(out[c.UserID], ui.Certifier{Fingerprint: c.Signer, Addresses: s.memberAddresses(addresses[c.Signer]), Created: c.Created})
-	}
-	return out
-}
-
-// memberAddresses links each address to where WKD serves its keys.
-func (s *Server) memberAddresses(addresses []string) []ui.MemberAddress {
-	out := make([]ui.MemberAddress, 0, len(addresses))
-	for _, a := range addresses {
-		out = append(out, ui.MemberAddress{Address: a, KeyURL: s.wkdURL(a)})
-	}
-	return out
 }
 
 func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {

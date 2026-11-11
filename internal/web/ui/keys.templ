@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -15,69 +14,30 @@ type Flash struct {
 	Text string
 }
 
-// KeyRow is one of the member's keys in the list.
-type KeyRow struct {
-	keys.Info
-	// Certifiers maps a User ID to the members' keys that certified it.
-	Certifiers map[string][]Certifier
-	// Others counts certifications by keys not in the directory.
-	Others int
-}
-
-// Certifier is a stored key that certified a User ID of a listed key.
-type Certifier struct {
-	Fingerprint string
-	// Addresses are the addresses the certifying key is stored for.
-	Addresses []MemberAddress
-	// Created is when it made the certification.
-	Created time.Time
-}
-
-// MemberAddress is an address a member's key is stored for, with the WKD
-// URL that serves the keys for it.
+// MemberAddress is an address a member's key is stored for, with the
+// member's page.
 type MemberAddress struct {
 	Address string
-	KeyURL  string
+	URL     string
 }
 
-// memberAddresses links each address to the keys WKD serves for it.
+// memberAddresses links each address to the member's page.
 templ memberAddresses(as []MemberAddress) {
 	for i, a := range as {
 		if i > 0 {
 			,
 		}
-		<a href={ templ.URL(a.KeyURL) }>{ a.Address }</a>
+		<a href={ templ.URL(a.URL) }>{ a.Address }</a>
 	}
 }
 
-// userIDs lists a key's User IDs, each with the members' keys that
-// certified it, and counts the certifications by other keys.
-templ userIDs(k KeyRow) {
+// userIDs lists a key's User IDs.
+templ userIDs(ids []string) {
 	<ul class="uids">
-		for _, id := range k.UserIDs {
-			<li>
-				{ id }
-				if cs := k.Certifiers[id]; len(cs) > 0 {
-					<span class="certs">
-						Certified by
-						for i, c := range cs {
-							if i > 0 {
-								,
-							}
-							<span title={ "Key " + groupFingerprint(c.Fingerprint) + ", certified " + date(c.Created) }>
-								@memberAddresses(c.Addresses)
-							</span>
-						}
-					</span>
-				}
-			</li>
+		for _, id := range ids {
+			<li>{ id }</li>
 		}
 	</ul>
-	if k.Others == 1 {
-		<p class="certs">Also certified by 1 key not in this directory</p>
-	} else if k.Others > 1 {
-		<p class="certs">Also certified by { fmt.Sprint(k.Others) } keys not in this directory</p>
-	}
 }
 
 // groupFingerprint writes a fingerprint in groups of four, as gpg does.
@@ -133,7 +93,7 @@ templ problem(p keys.Problem) {
 }
 
 // fixes lists, per key, what its owner should fix.
-templ fixes(list []KeyRow) {
+templ fixes(list []keys.Info) {
 	<section class="fixes" aria-labelledby="fixes-title">
 		<h2 id="fixes-title">What to fix</h2>
 		for _, k := range list {
@@ -149,7 +109,7 @@ templ fixes(list []KeyRow) {
 	</section>
 }
 
-func anyProblems(list []KeyRow) bool {
+func anyProblems(list []keys.Info) bool {
 	for _, k := range list {
 		if len(k.Health.Problems) > 0 {
 			return true
@@ -159,7 +119,7 @@ func anyProblems(list []KeyRow) bool {
 }
 
 // Keys lists the member's keys, newest first, as WKD serves them.
-templ Keys(p Page, list []KeyRow, f Flash, address string) {
+templ Keys(p Page, list []keys.Info, f Flash, address string) {
 	@Layout(p) {
 		<header class="page-head">
 			<div>
@@ -193,7 +153,7 @@ templ Keys(p Page, list []KeyRow, f Flash, address string) {
 							<tr>
 								<td><code class="fpr">{ groupFingerprint(k.Fingerprint) }</code></td>
 								<td>
-									@userIDs(k)
+									@userIDs(k.UserIDs)
 								</td>
 								<td><time datetime={ k.Created.UTC().Format(time.RFC3339) }>{ date(k.Created) }</time></td>
 								<td>
@@ -204,7 +164,7 @@ templ Keys(p Page, list []KeyRow, f Flash, address string) {
 									}
 								</td>
 								<td>
-									@keyStatus(k.Info)
+									@keyStatus(k)
 								</td>
 								<td class="actions-cell">
 									<a class="btn btn-danger" href={ templ.SafeURL("/keys/" + k.Fingerprint + "/remove") }>Remove</a>
