@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +11,6 @@ import (
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/store"
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/web/ui"
-	"git.gnuweeb.net/GNUWeeb/matcha/internal/wkd"
 )
 
 // Every handler here runs behind requireLogin and works only on the keys
@@ -31,12 +29,6 @@ func validFingerprint(s string) bool {
 		}
 	}
 	return true
-}
-
-// wkdURL is where clients fetch the keys for address.
-func (s *Server) wkdURL(address string) string {
-	local, domain, _ := strings.Cut(address, "@")
-	return "https://" + domain + "/.well-known/openpgpkey/hu/" + wkd.Hash(local) + "?l=" + url.QueryEscape(local)
 }
 
 func (s *Server) keyList(w http.ResponseWriter, r *http.Request) {
@@ -90,15 +82,6 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 		signers = append(signers, keys.Signer{Fingerprint: fpr, Data: k.Data})
 	}
 	return signers, addresses, nil
-}
-
-// memberAddresses links each address to where WKD serves its keys.
-func (s *Server) memberAddresses(addresses []string) []ui.MemberAddress {
-	out := make([]ui.MemberAddress, 0, len(addresses))
-	for _, a := range addresses {
-		out = append(out, ui.MemberAddress{Address: a, KeyURL: s.wkdURL(a)})
-	}
-	return out
 }
 
 func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {

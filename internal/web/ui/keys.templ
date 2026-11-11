@@ -14,20 +14,20 @@ type Flash struct {
 	Text string
 }
 
-// MemberAddress is an address a member's key is stored for, with the WKD
-// URL that serves the keys for it.
+// MemberAddress is an address a member's key is stored for, with the
+// member's page.
 type MemberAddress struct {
 	Address string
-	KeyURL  string
+	URL     string
 }
 
-// memberAddresses links each address to the keys WKD serves for it.
+// memberAddresses links each address to the member's page.
 templ memberAddresses(as []MemberAddress) {
 	for i, a := range as {
 		if i > 0 {
 			,
 		}
-		<a href={ templ.URL(a.KeyURL) }>{ a.Address }</a>
+		<a href={ templ.URL(a.URL) }>{ a.Address }</a>
 	}
 }
 

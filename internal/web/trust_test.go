@@ -151,7 +151,7 @@ func TestTrustShowsDirectLinks(t *testing.T) {
 	}
 
 	in, out := sections("alice@gnuweeb.org")
-	if !strings.Contains(in, ">bob@gnuweeb.org</a>") || strings.Contains(in, "carol@") {
+	if !strings.Contains(in, `<a href="/members/bob@gnuweeb.org">bob@gnuweeb.org</a>`) || strings.Contains(in, "carol@") {
 		t.Error("alice's certifiers are not just bob")
 	}
 	if !strings.Contains(in, "Also certified by 1 key not in this directory") {

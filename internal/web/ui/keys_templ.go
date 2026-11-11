@@ -22,14 +22,14 @@ type Flash struct {
 	Text string
 }
 
-// MemberAddress is an address a member's key is stored for, with the WKD
-// URL that serves the keys for it.
+// MemberAddress is an address a member's key is stored for, with the
+// member's page.
 type MemberAddress struct {
 	Address string
-	KeyURL  string
+	URL     string
 }
 
-// memberAddresses links each address to the keys WKD serves for it.
+// memberAddresses links each address to the member's page.
 func memberAddresses(as []MemberAddress) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -63,9 +63,9 @@ func memberAddresses(as []MemberAddress) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var2 templ.SafeURL
-			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(a.KeyURL))
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(a.URL))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/keys.templ`, Line: 30, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/keys.templ`, Line: 30, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -78,7 +78,7 @@ func memberAddresses(as []MemberAddress) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(a.Address)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/keys.templ`, Line: 30, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/keys.templ`, Line: 30, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
