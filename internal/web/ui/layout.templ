@@ -72,6 +72,14 @@ templ Layout(p Page) {
 									}
 								>Keys</a>
 							</li>
+							<li>
+								<a
+									href="/trust"
+									if p.Nav == "/trust" {
+										aria-current="page"
+									}
+								>Web of trust</a>
+							</li>
 						</ul>
 						<div class="side-foot">
 							<span class="who" title={ p.Address }>{ p.Address }</span>

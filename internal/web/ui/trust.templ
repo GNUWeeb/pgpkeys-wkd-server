@@ -1,0 +1,87 @@
+package ui
+
+import (
+	"fmt"
+	"time"
+)
+
+// TrustLink is another member's key linked to the member's keys by
+// certifications in one direction.
+type TrustLink struct {
+	Fingerprint string
+	// Addresses are the addresses the other key is stored for.
+	Addresses []MemberAddress
+	// UserIDs are the certified User IDs, on whichever key was certified.
+	UserIDs []string
+	// Certified is when the latest of these certifications was made.
+	Certified time.Time
+}
+
+// Trust shows the members linked to the member by certifications: those
+// whose keys certified the member's keys (in, plus others by keys not in
+// the directory) and those whose keys the member's keys certified (out).
+templ Trust(p Page, in []TrustLink, others int, out []TrustLink) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Web of trust</h1>
+				<p class="muted">Members whose keys are linked to yours by certifications. Publishing a key does not depend on them.</p>
+			</div>
+		</header>
+		<section class="trust" aria-labelledby="trust-in">
+			<h2 id="trust-in">Certified your keys</h2>
+			if len(in) == 0 {
+				<p class="muted">No member's key has certified yours yet.</p>
+			} else {
+				@trustTable(in)
+			}
+			if others == 1 {
+				<p class="certs">Also certified by 1 key not in this directory</p>
+			} else if others > 1 {
+				<p class="certs">Also certified by { fmt.Sprint(others) } keys not in this directory</p>
+			}
+		</section>
+		<section class="trust" aria-labelledby="trust-out">
+			<h2 id="trust-out">Certified by your keys</h2>
+			if len(out) == 0 {
+				<p class="muted">Your keys have not certified any member's key yet.</p>
+			} else {
+				@trustTable(out)
+			}
+		</section>
+		<p class="muted">A certification shows here once the certified key is uploaded with it: after you certify a key, send it to its owner, who imports it and uploads it again.</p>
+	}
+}
+
+templ trustTable(links []TrustLink) {
+	<div class="tbl-wrap">
+		<table class="tbl">
+			<thead>
+				<tr>
+					<th scope="col">Member</th>
+					<th scope="col">Key</th>
+					<th scope="col">User IDs certified</th>
+					<th scope="col">Latest</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, l := range links {
+					<tr>
+						<td>
+							@memberAddresses(l.Addresses)
+						</td>
+						<td><code class="fpr">{ groupFingerprint(l.Fingerprint) }</code></td>
+						<td>
+							<ul class="uids">
+								for _, id := range l.UserIDs {
+									<li>{ id }</li>
+								}
+							</ul>
+						</td>
+						<td><time datetime={ l.Certified.UTC().Format(time.RFC3339) }>{ date(l.Certified) }</time></td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}

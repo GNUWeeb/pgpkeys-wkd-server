@@ -94,6 +94,7 @@ func New(opts Options, st *store.Store, mailer Mailer, log *slog.Logger) *Server
 		r.Post("/keys", s.requireLogin(s.addKey))
 		r.Get("/keys/{fpr}/remove", s.requireLogin(s.removeKeyForm))
 		r.Post("/keys/{fpr}/remove", s.requireLogin(s.removeKey))
+		r.Get("/trust", s.requireLogin(s.trust))
 	})
 	s.router = r
 	return s

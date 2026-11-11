@@ -48,6 +48,7 @@ Settled by the maintainer on 2026-11-11:
 | Phase 5 in the repository | Deployment section in `README.md`, example nginx configuration for both hosts, and a `compose.yaml`. DNS, TLS, the nginx changes on `gnuweeb.org` and the production `.env` are done by hand on the servers. |
 | DSA keys | Refused, although `sq` 1.3.1 accepts DSA-2048 (confirmed 2026-11-11 after phase 6 found the difference). |
 | Revoked keys in the export | Kept in `keys/`, so importing the keyring spreads the revocation; kernel.org removes them by hand instead (confirmed 2026-11-11). |
+| Web of trust page | Each member sees only their direct links: who certified their keys and whose keys they certified. No root key, so no trust paths, and no graph of the whole directory (decided 2026-11-11). |
 
 ## Where We Are (observed)
 
@@ -215,6 +216,8 @@ Status: deferred by the maintainer, 2026-11-11.
 - No gate: publication never depends on certifications.
 
 Status: done 2026-11-11, without the optional graph. Under each User ID the key list names the members whose stored keys certified it, by the addresses those keys are stored for, and counts certifications by keys outside the directory. Decided here: a certification counts when it verifies against a stored key, uses a hash the phase 6 policy accepts, has not expired and was not revoked later by the same signer; certifications sit with the User ID they are about rather than in a column, which made the table wider than a desktop page. Not done: the graph. It would show every member's address to every member, which is the owner's call; the per-key list shows only those who certified the member's own key. Checked: GnuPG 2.4.9 certified a stored key with two members' keys and one outside key; after the upload the list named both members and counted the third, in light and dark and at 390 px without widening the page.
+
+Added 2026-11-11, after the maintainer's decision on the web of trust page: a "Web of trust" page lists, for the logged-in member, the members whose keys certified theirs and the members whose keys theirs certified. The optional graph stays out: there is no root key to draw paths to, and a graph of everyone would list every member's address to every member.
 
 ## Design Reference: greentea (observed)
 
