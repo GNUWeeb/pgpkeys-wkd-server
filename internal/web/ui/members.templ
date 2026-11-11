@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"time"
 
 	"git.gnuweeb.net/GNUWeeb/matcha/internal/keys"
@@ -21,6 +22,131 @@ type MemberView struct {
 	Keys []keys.Info
 	// Download serves the keys, armored.
 	Download string
+	// Root is the chain of certifications from the root key, nil when no
+	// root key is set.
+	Root *RootPath
+}
+
+// RootPath is the shortest chain of certifications from the root key to
+// a member's keys: Steps start at the root key and end at the member's
+// key, each certified by the one before. No steps: no chain leads there.
+type RootPath struct {
+	Steps []PathStep
+}
+
+// PathStep is a key on a chain, with the addresses it is stored for.
+type PathStep struct {
+	Fingerprint string
+	Addresses   []MemberAddress
+}
+
+// MemberRow is a member in the list of members.
+type MemberRow struct {
+	Address  string
+	Name     string
+	Initials string
+	Photo    string
+	URL      string
+	// Keys counts the keys stored for the address.
+	Keys int
+	// Root is their chain from the root key, nil when no root key is set.
+	Root *RootPath
+}
+
+// Members lists the members who have keys in the directory, with how far
+// each is from the root key when one is set (withRoot).
+templ Members(p Page, rows []MemberRow, withRoot bool) {
+	@Layout(p) {
+		<header class="page-head">
+			<div>
+				<h1>Members</h1>
+				<p class="muted">Everyone whose keys Web Key Directory serves. Open a member for their keys.</p>
+			</div>
+		</header>
+		if len(rows) == 0 {
+			<div class="empty">
+				<p class="empty-title">No members yet</p>
+				<p>Members appear here once they add a key.</p>
+			</div>
+		} else {
+			<div class="tbl-wrap">
+				<table class="tbl">
+					<thead>
+						<tr>
+							<th scope="col">Member</th>
+							<th scope="col">Keys</th>
+							if withRoot {
+								<th scope="col">Root key</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, m := range rows {
+							<tr>
+								<td>
+									<a class="member-cell" href={ templ.URL(m.URL) }>
+										@avatar(m.Initials, m.Photo, "")
+										<span>
+											<span class="member-name">{ m.Name }</span>
+											<span class="muted member-address">{ m.Address }</span>
+										</span>
+									</a>
+								</td>
+								<td>{ strconv.Itoa(m.Keys) }</td>
+								if withRoot {
+									<td>
+										@rootDistance(m.Root)
+									</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+// rootDistance says how many certifications away from the root key a
+// member is.
+templ rootDistance(r *RootPath) {
+	switch {
+		case r == nil || len(r.Steps) == 0:
+			<span class="badge">Not connected</span>
+		case len(r.Steps) == 1:
+			<span class="badge ok">Root key</span>
+		case len(r.Steps) == 2:
+			<span class="badge ok">Certified by it</span>
+		default:
+			<span class="badge ok">{ strconv.Itoa(len(r.Steps) - 1) } steps</span>
+	}
+}
+
+// rootPath shows the chain from the root key to a member's keys, or that
+// there is none; who names the member ("you" on the member's own pages).
+templ rootPath(r *RootPath, who string) {
+	<section class="trust" aria-labelledby="root-path">
+		<h2 id="root-path">Path to the root key</h2>
+		switch {
+			case len(r.Steps) == 0:
+				<p class="muted">Not connected yet: no chain of certifications leads from the root key to { who }. A member who is connected can certify a key to connect it.</p>
+			case len(r.Steps) == 1:
+				<p class="muted">This is the root key: the web of trust is traced to it.</p>
+			default:
+				<ol class="path">
+					for i, st := range r.Steps {
+						<li>
+							@memberAddresses(st.Addresses)
+							if i == 0 {
+								<span class="badge ok">root</span>
+							}
+							<code class="fpr path-fpr">{ groupFingerprint(st.Fingerprint) }</code>
+						</li>
+					}
+				</ol>
+				<p class="certs">Each key certified the one after it.</p>
+		}
+	</section>
 }
 
 // Member shows a member and their keys as WKD serves them.
@@ -38,6 +164,13 @@ templ Member(p Page, v MemberView) {
 		</header>
 		if v.Self {
 			<p class="muted">This is how other members see you. <a href="/">Your keys</a> has the page to change them.</p>
+		}
+		if v.Root != nil {
+			if v.Self {
+				@rootPath(v.Root, "your keys")
+			} else {
+				@rootPath(v.Root, v.Name + "'s keys")
+			}
 		}
 		<section class="trust" aria-labelledby="member-keys">
 			<h2 id="member-keys">Keys</h2>

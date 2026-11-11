@@ -80,6 +80,14 @@ templ Layout(p Page) {
 									}
 								>Web of trust</a>
 							</li>
+							<li>
+								<a
+									href="/members"
+									if p.Nav == "/members" {
+										aria-current="page"
+									}
+								>Members</a>
+							</li>
 						</ul>
 						<div class="side-foot">
 							<span class="who" title={ p.Address }>{ p.Address }</span>

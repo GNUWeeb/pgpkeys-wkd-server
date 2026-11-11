@@ -368,7 +368,7 @@ main:focus {
 	margin: 0;
 }
 
-/* A member's page: avatar beside the name. */
+/* Members: avatar beside the name, on a member's page and in the list. */
 
 .member-head {
 	display: flex;
@@ -378,6 +378,29 @@ main:focus {
 }
 
 .member-head h1 {
+	overflow-wrap: anywhere;
+}
+
+.member-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	color: inherit;
+	text-decoration: none;
+}
+
+.member-name {
+	display: block;
+	font-weight: 600;
+}
+
+.member-cell:hover .member-name {
+	text-decoration: underline;
+}
+
+.member-address {
+	display: block;
+	font-size: var(--text-sm);
 	overflow-wrap: anywhere;
 }
 
@@ -539,6 +562,38 @@ main:focus {
 .badge.danger {
 	background: var(--danger-bg);
 	color: var(--danger);
+}
+
+/* The chain of certifications from the root key to a member, one key a
+   line, each after an arrow from the key that certified it. */
+
+.path {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.path li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 var(--space-2);
+}
+
+.path li + li::before {
+	content: "\2192";
+	color: var(--muted);
+}
+
+.path .path-fpr {
+	flex-basis: 100%;
+	padding: 0;
+	background: none;
+	font-size: var(--text-xs);
+	color: var(--muted);
 }
 
 .flash > :last-child {

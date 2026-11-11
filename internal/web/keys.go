@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -69,6 +70,12 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 	if err != nil {
 		return nil, nil, err
 	}
+	signers, addresses := signersOf(all)
+	return signers, addresses, nil
+}
+
+// signersOf is signers for the stored keys all, ordered by fingerprint.
+func signersOf(all []store.StoredKey) ([]keys.Signer, map[string][]string) {
 	latest := map[string]store.StoredKey{}
 	addresses := map[string][]string{}
 	for _, k := range all {
@@ -81,7 +88,8 @@ func (s *Server) signers(r *http.Request) ([]keys.Signer, map[string][]string, e
 	for fpr, k := range latest {
 		signers = append(signers, keys.Signer{Fingerprint: fpr, Data: k.Data})
 	}
-	return signers, addresses, nil
+	slices.SortFunc(signers, func(a, b keys.Signer) int { return strings.Compare(a.Fingerprint, b.Fingerprint) })
+	return signers, addresses
 }
 
 func (s *Server) addKeyForm(w http.ResponseWriter, r *http.Request) {
